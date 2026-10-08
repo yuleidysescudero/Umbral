@@ -165,5 +165,5 @@ def test_filtro_tvn_aun_no_lo_cubre_y_modo_demo(browser):
     page.get_by_test_id("demo-cifra").click()
     page.wait_for_function("document.querySelectorAll('[data-testid=assistant-answer]').length > 0", timeout=60_000)
     text = page.get_by_test_id("assistant-answer").last.inner_text()
-    assert "2023" in text and "Banco Mundial" in text
+    assert "2024" in text and "Banco Mundial" in text and "dato anual, no de hoy" in text  # pregunta literal del jurado
     page.context.close()
