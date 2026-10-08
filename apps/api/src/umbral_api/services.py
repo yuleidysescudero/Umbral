@@ -13,6 +13,7 @@ from pathlib import Path
 
 from . import __version__
 from .auth import Authenticator
+from .cifras import fmt_es, score_display
 from .config import Settings
 from .drafts import EvidencePack, build_pack, build_template_package, validate_package
 from .errors import (
@@ -262,8 +263,8 @@ class Services:
         needs = score.band == ScoreBand.alto and ev_status == EvidenceStatus.insuficiente
         top2 = sorted(score.components, key=lambda c: -c.points)[:2]
         reason = (
-            f"Prioridad {score.band.value} ({score.total:.1f}); mayores aportes: "
-            + ", ".join(f"{c.key} {c.points:g}" for c in top2)
+            f"Prioridad {score.band.value} ({score_display(score.total)}); mayores aportes: "
+            + ", ".join(f"{c.key} {fmt_es(c.points)}" for c in top2)
             + f"; evidencia {ev_status.value}"
         )
         return TopicSummary(
@@ -272,6 +273,7 @@ class Services:
             category=base.category,
             category_label=CATEGORY_LABELS[base.category.value],
             score=score.total,
+            score_display=score_display(score.total),
             band=score.band,
             score_components=score.components if with_components else [],
             urgency=score.urgency_tiebreak,

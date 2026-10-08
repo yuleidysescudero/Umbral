@@ -7,6 +7,7 @@ import time
 import uuid
 from datetime import timedelta
 
+from .cifras import exact_str, fmt_es, format_value_es, score_display
 from .models import (
     AnswerStatus,
     Contradiction,
@@ -22,8 +23,8 @@ from .models import (
 )
 from .retrieval import Doc, SearchIndex, fold, tokenize
 from .scoring import RULES_VERSION
-from .security import looks_like_instruction, looks_like_profiling
-from .snapshot import Corpus
+from .security import looks_like_instruction, looks_like_profiling, split_injection
+from .snapshot import Corpus, parse_dt
 from .topics import COUNTRY_KEYWORDS, INDICATOR_KEYWORDS, MASKED_TITLE, TopicBase
 from .util import fmt_date_pa
 
@@ -115,10 +116,20 @@ def _number_kind(folded_question: str) -> tuple[str, re.Pattern[str], re.Pattern
     return kind
 
 
+_RE_SEISMIC = re.compile(r"\bsism\w*|\btemblor\w*|\bterremoto\w*|\bmagnitud\w*|\bepicentro\w*|\bearthquake")
+# Daños humanos o materiales: USGS no es evidencia de eso; esas preguntas siguen el camino de titulares/abstención.
+_RE_HUMAN_IMPACT = re.compile(r"muert|murier|fallec|herid|victim|evacu|afectad|damnific|dano|danos|perdid|destru|inund")
+INJECTION_WARNING = "inyeccion_detectada"
+SEISMIC_BOX_NOTE = "La caja regional (lat 5–12, lon −86 a −76) no equivale al territorio de Panamá."
+SEISMIC_DAMAGE_NOTE = "USGS no es evidencia de daños, inundaciones ni pérdidas."
+
+
 def _detect_intent(q: str) -> QueryIntent:
     f = fold(q)
     if _RE_VERIF.search(f):
         return QueryIntent.verificaciones
+    if _RE_SEISMIC.search(f) and not _RE_HUMAN_IMPACT.search(f):
+        return QueryIntent.eventos_sismicos
     if _RE_AGENDA.search(f):
         return QueryIntent.agenda
     if _RE_ECON.search(f):
@@ -155,6 +166,19 @@ class QueryEngine:
             )
         intent = _detect_intent(q)
         if warnings:
+            warnings.insert(0, INJECTION_WARNING)
+            legit, _fragment = split_injection(q)
+            if len(tokenize(legit)) >= 2 and not looks_like_instruction(legit):
+                # Se rechaza el fragmento y se responde SOLO la parte legítima (el fragmento no se repite).
+                inner = self.answer(req.model_copy(update={"question": legit}), agenda)
+                inner.question = req.question
+                inner.answer = (
+                    "Rechacé un fragmento de tu mensaje porque intenta darle órdenes al sistema (marcas de rol, "
+                    "delimitadores o acciones como aprobar o publicar). No se ejecutó nada.\n\n"
+                    f"Sobre «{legit}»: " + inner.answer
+                )
+                inner.warnings = warnings + inner.warnings
+                return inner
             # T07: la instrucción no se ejecuta ni se busca; se rechaza de forma explícita y auditable.
             return self._abstain(
                 req, intent, t0,
@@ -176,7 +200,11 @@ class QueryEngine:
             if scope is None:
                 return self._abstain(req, intent, t0, "El tema indicado no existe en el snapshot servido.", warnings)
 
-        if intent == QueryIntent.agenda:
+        if intent == QueryIntent.eventos_sismicos and not self.corpus.events:
+            intent = QueryIntent.busqueda  # paquete sin events.geojson (fixture): se buscan titulares
+        if intent == QueryIntent.eventos_sismicos:
+            resp = self._sismos(req, t0)
+        elif intent == QueryIntent.agenda:
             resp = self._agenda(req, agenda, t0)
         elif intent == QueryIntent.verificaciones:
             resp = self._verificaciones(req, scope, t0)
@@ -270,6 +298,20 @@ class QueryEngine:
                     out.append(raw)
         return list(dict.fromkeys(out))
 
+    def _content_terms(self, question: str) -> set[str]:
+        """Tokens de la pregunta que nombran contenido: sin países, años, números ni palabras de consulta."""
+        skip: set[str] = set()
+        for kws in COUNTRY_KEYWORDS.values():
+            for kw in kws:
+                skip.update(tokenize(kw))
+        for iso, name in _COUNTRY_ES.items():
+            skip.update(tokenize(name))
+            skip.add(fold(iso))
+        for w in _QUERY_WORDS:
+            skip.update(tokenize(w))
+        q, _ = self.index.expand_query(question)
+        return {t for t in q if t not in skip and not t.isdigit()}
+
     # ------------------------------------------------------------------ intents
     def _agenda(self, req: QueryRequest, agenda: list[TopicSummary], t0: float) -> QueryResponse:
         top = agenda[: max(1, min(req.limit, 5))] if agenda else []
@@ -281,7 +323,7 @@ class QueryEngine:
             b = self.bases[t.id]
             lines.append(
                 f"{i}. **{t.title}**\n"
-                f"Puntaje **{t.score:.2f}** ({t.band.value}) · evidencia {t.evidence_status_label.lower()}"
+                f"Puntaje **{score_display(t.score)}** ({t.band.value}) · evidencia {t.evidence_status_label.lower()}"
                 f"{' · requiere investigación (prioridad alta con evidencia insuficiente)' if t.needs_investigation else ''}."
             )
             rep = b.representative
@@ -297,6 +339,66 @@ class QueryEngine:
             req, QueryIntent.agenda, t0, answer_status=AnswerStatus.respondida, answer=ans, citations=cites,
             related_topic_ids=[t.id for t in top],
             missing=[g for t in top for g in [f"{t.title}: ver verificaciones pendientes en la ficha."] if t.evidence_status.value != "suficiente"][:5],
+        )
+
+    def _sismos(self, req: QueryRequest, t0: float) -> QueryResponse:
+        """Sismos USGS del paquete: filtra por año/fecha, ordena por magnitud y cita cada evento por su id."""
+        f = fold(req.question)
+        events = self.corpus.events
+        have_years = sorted({int(str(e["time"])[:4]) for e in events})
+        years = [int(y) for y in _RE_YEAR.findall(f)]
+        missing_years = [y for y in years if y not in have_years]
+        if missing_years:
+            return self._abstain(
+                req, QueryIntent.eventos_sismicos, t0,
+                f"el paquete USGS no contiene sismos de {', '.join(map(str, missing_years))} "
+                f"(solo {', '.join(map(str, have_years))}). " + SEISMIC_DAMAGE_NOTE,
+                missing=[f"Catálogo USGS o SINAPROC del periodo {', '.join(map(str, missing_years))}."],
+            )
+        sel = [e for e in events if not years or int(str(e["time"])[:4]) in years]
+        if re.search(r"\bhoy\b|\bayer\b|esta semana|este mes", f):
+            recent = self.corpus.cutoff - timedelta(days=31)
+            sel = [e for e in sel if (parse_dt(e["time"]) or recent) >= recent]
+            if not sel:
+                return self._abstain(
+                    req, QueryIntent.eventos_sismicos, t0,
+                    "el paquete USGS no tiene sismos cercanos al corte del snapshot "
+                    f"({fmt_date_pa(self.corpus.cutoff)}); sus eventos son de {', '.join(map(str, have_years))}. "
+                    + SEISMIC_DAMAGE_NOTE,
+                    missing=["El reporte sismológico del día (USGS o Instituto de Geociencias de la UP)."],
+                )
+        if "panam" in f:
+            in_pa = [e for e in sel if "panama" in fold(str(e.get("place", "")))]
+        else:
+            in_pa = sel
+        ranked = sorted(sel, key=lambda e: (-float(e["magnitude"]), str(e["id"])))
+        top = ranked[:5]
+        lines = []
+        cites: list[QueryCitation] = []
+        for i, e in enumerate(top, 1):
+            when = parse_dt(e["time"])
+            utc = when.strftime("%Y-%m-%d %H:%M UTC") if when else str(e["time"])
+            pa = (when - timedelta(hours=5)).strftime("%d/%m/%Y %H:%M") if when else "—"
+            depth = e.get("depth")
+            lines.append(
+                f"{i}. **M {fmt_es(float(e['magnitude']), 1)}** · {e.get('place') or 'ubicación sin nombre'} · {utc} "
+                f"({pa} hora de Panamá) · profundidad {fmt_es(float(depth), 1) if depth is not None else '—'} km [{e['id']}]"
+            )
+            cites.append(QueryCitation(evidence_id=str(e["id"]), field="magnitude", passage=str(e["magnitude"]),
+                                       title=f"USGS {e['id']}: M {e['magnitude']} · {e.get('place') or ''}", url=e.get("url")))
+        period = ", ".join(map(str, years)) if years else ", ".join(map(str, have_years))
+        biggest = top[0]
+        ans = (
+            f"**Sismos registrados por USGS en el paquete ({period})**: {len(sel)} en la caja regional"
+            + (f", {len(in_pa)} con «Panama» en la ubicación" if "panam" in f else "")
+            + f". El mayor fue **M {fmt_es(float(biggest['magnitude']), 1)}** ({biggest.get('place')}).\n\n"
+            + "\n".join(lines)
+            + f"\n\n{SEISMIC_BOX_NOTE} {SEISMIC_DAMAGE_NOTE}"
+        )
+        return self._base_resp(
+            req, QueryIntent.eventos_sismicos, t0, answer_status=AnswerStatus.respondida, answer=ans, citations=cites,
+            missing=["Daños o afectaciones: reporte oficial de SINAPROC; USGS solo mide el evento sísmico."],
+            warnings=[SEISMIC_BOX_NOTE], coverage=1.0, matched_terms=["sismo"],
         )
 
     def _verificaciones(self, req: QueryRequest, scope: TopicBase | None, t0: float) -> QueryResponse:
@@ -371,7 +473,7 @@ class QueryEngine:
                         else:
                             found += 1
                             selected_ids.add(row.id)
-                            lines.append(f"- {label}, {y}: {row.value:g} {row.unit or ''} (dato anual de referencia, no una medición de hoy).")
+                            lines.append(f"- {label}, {y}: {format_value_es(row.value, row.unit)} (dato anual de referencia, no una medición de hoy).")
                             cites.extend(_ind_cites(row))
                 else:
                     valid = [p for p in rows if not p.is_missing and p.year <= self.corpus.cutoff.year]
@@ -381,7 +483,7 @@ class QueryEngine:
                     row = valid[-1]
                     found += 1
                     selected_ids.add(row.id)
-                    lines.append(f"- {label}, último año con dato {row.year}: {row.value:g} {row.unit or ''} (dato anual de referencia, no una medición de hoy).")
+                    lines.append(f"- {label}, último año con dato {row.year}: {format_value_es(row.value, row.unit)} (dato anual de referencia, no una medición de hoy).")
                     cites.extend(_ind_cites(row))
                     later = [p for p in rows if p.is_missing and p.year > row.year]
                     if later:
@@ -448,6 +550,12 @@ class QueryEngine:
                     f"La fuente {h.doc.doc_id} contiene instrucciones dirigidas a un agente: se trató como contenido no confiable y no se usó."
                 )
         ind_hits = [h for h in hits if h.doc.kind == "indicador" and h.coverage >= 0.5]
+        # Regla general: solo se cita lo que comparte un término de contenido con la pregunta (no basta «Panamá»
+        # ni el año): así no aparecen «rellenos» como población o desempleo en una pregunta sobre sismos.
+        content = self._content_terms(req.question)
+        if content:
+            usable = [h for h in usable if set(h.matched) & content]
+            ind_hits = [h for h in ind_hits if set(h.matched) & content]
         if not usable and not ind_hits:
             return self._abstain(
                 req, QueryIntent.busqueda, t0, "las únicas coincidencias son fuentes no confiables o de baja cobertura.",
@@ -485,6 +593,7 @@ class QueryEngine:
         status = AnswerStatus.respondida if coverage >= 0.75 else AnswerStatus.parcial
         missing: list[str] = []
         used_clusters: list[str] = []
+        usable_ids = {h.doc.doc_id for h in usable}
         for h in usable[:3]:
             a = self.corpus.articles[h.doc.doc_id]
             if a.cluster_id and a.cluster_id not in used_clusters:
@@ -498,6 +607,8 @@ class QueryEngine:
             for a in base.usable_articles:
                 if a.origin_key in seen_keys:
                     continue
+                if content and not (set(tokenize(a.title)) & content) and a.id not in usable_ids:
+                    continue  # mismo grupo, pero sin un término de la pregunta: no se cita
                 seen_keys.add(a.origin_key)
                 if len(seen_keys) > 3:
                     break
@@ -545,12 +656,12 @@ class QueryEngine:
 def _ind_text(p: IndicatorPoint) -> str:
     if p.is_missing:
         return f"{p.indicator_name}, {p.country_iso3} {p.year}: valor ausente en la fuente."
-    return f"{p.indicator_name}, {p.country_iso3} {p.year}: {p.value:g} {p.unit or ''} (dato anual de referencia, no de hoy)."
+    return f"{p.indicator_name}, {p.country_iso3} {p.year}: {format_value_es(p.value, p.unit)} (dato anual de referencia, no de hoy)."
 
 
 def _ind_cites(p: IndicatorPoint) -> list[QueryCitation]:
     return [
-        QueryCitation(evidence_id=p.id, field="value", passage=f"{p.value:g}", title=_ind_text(p), url=p.source_url),
+        QueryCitation(evidence_id=p.id, field="value", passage=exact_str(p.value), title=_ind_text(p), url=p.source_url),
         QueryCitation(evidence_id=p.id, field="year", passage=str(p.year), title=_ind_text(p), url=p.source_url),
     ]
 

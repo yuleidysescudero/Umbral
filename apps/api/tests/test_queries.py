@@ -143,7 +143,7 @@ def test_t06_unknown_country_does_not_get_panama_figures(make_app, q):
 
 def test_known_country_and_indicator_still_answered(make_app):
     r = ask(make_app(), "¿Cuál fue el crecimiento del PIB de Panamá en 2023?")
-    assert r["answerStatus"] == "respondida" and "7.3" in r["answer"]
+    assert r["answerStatus"] == "respondida" and "7,3 %" in r["answer"]
     r = ask(make_app(), "desempleo en Colombia")
     assert r["answerStatus"] in {"respondida", "parcial"} and "COL" in r["answer"] or "Colombia" in r["answer"]
 

@@ -163,6 +163,8 @@ class QueryIntent(StrEnum):
     contexto_economico = "contexto_economico"
     verificaciones = "verificaciones"
     busqueda = "busqueda"
+    eventos_sismicos = "eventos_sismicos"
+    resumen_periodo = "resumen_periodo"
 
 
 # --------------------------------------------------------------------------- evidencia
@@ -251,6 +253,7 @@ class ScoreComponent(ApiModel):
 
 class ScoreDetail(ApiModel):
     total: float
+    display: str = Field("", description="Total redondeado una sola vez (ROUND_HALF_UP, coma decimal), igual en tarjeta, «Por qué» y exportación.")
     band: ScoreBand
     rules_version: str
     formula: str = "P = 30R + 25I + 20U + 15N + 10E"
@@ -358,6 +361,7 @@ class TopicSummary(ApiModel):
     category: Category
     category_label: str
     score: float
+    score_display: str = Field("", description="Puntaje redondeado una sola vez en la API (ROUND_HALF_UP, coma decimal); la web lo muestra tal cual.")
     band: ScoreBand
     score_components: list[ScoreComponent] = Field(default_factory=list)
     urgency: float

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from fractions import Fraction
 
+from .cifras import score_display
 from .models import (
     GeoRelevance,
     ImpactAssignment,
@@ -200,6 +201,7 @@ def score_topic(inp: ScoreInputs, *, weights: dict[str, int] | None = None, rule
     total_f = round(float(total), 2)
     return ScoreDetail(
         total=total_f,
+        display=score_display(total_f),
         band=band_for(total),
         rules_version=rules_version,
         formula="P = " + " + ".join(f"{weights[k]}{k}" for k in WEIGHTS),

@@ -16,15 +16,35 @@ _PATTERNS = [
     r"system\s*prompt",
     r"(act[uú]a|comp[oó]rtate|responde)\s+como\s+(si\s+fueras\s+)?(un|una|el|la)?\s*\w*\s*(sin\s+restricciones|administrador|root|dios)",
     r"you\s+are\s+now\s+(an?\s+)?\w+",
-    r"developer\s+mode|modo\s+desarrollador|jailbreak|\bDAN\b",
+    r"developer\s+mode|modo\s+desarrollador|jailbreak|(?-i:\bDAN\b)",  # en mayúsculas: «dan» es un verbo común en titulares
     r"(cambia|modifica|sobrescribe)\s+(las\s+)?(reglas|el\s+puntaje|la\s+puntuaci[oó]n|los\s+pesos)",
     r"asigna\w*\s+(prioridad|puntaje|impacto)\s+(alta|m[aá]xim\w+|100)",
     r"<\s*/?\s*(system|assistant|instruction)\s*>",
     r"\[\s*(system|inst)\s*\]",
     r"nuevas?\s+instrucciones\s*:",
     r"(api[_\s-]?key|gemini_api_key|firebase|bearer\s+[a-z0-9._-]{12,})",
+    # QA TVN 3.5: delimitadores y marcas de rol que intentan cerrar el contexto y abrir uno nuevo.
+    r"(?:^|[\s>\]}])(system|assistant|developer|sistema|asistente)\s*:",
+    r"<\s*/\s*[a-z_][\w-]{0,30}\s*>",
+    r"<\|[^|>]{1,40}\|>",
+    r"(?:^|\s)#{3,}\s*\w",
+    r"\[\s*/?\s*inst\s*\]",
+    # Órdenes de acción sobre el sistema al inicio de una frase (no «¿el gobierno aprueba…?» dentro de una pregunta).
+    r"(?:^|[.:;!?\n]\s*)(aprueba|apruebe|publica|publique|borra|borre|elimina|elimine|revela|revele|ignora|ignore|"
+    r"desactiva|cambia|modifica)\w*\s+(\w+\s+){0,3}(todos?|todas?|borradores?|casos?|reglas?|pesos?|puntajes?|"
+    r"instrucciones|filtros?|sistema|configuraci[oó]n|prompt|base\s+de\s+datos)\b",
+    r"(?:^|[.:;!?\n]\s*)(approve|publish|delete|reveal|ignore|disable|override)\s+(\w+\s+){0,3}(all|every|drafts?|"
+    r"rules?|weights?|instructions|filters?|system|settings|prompt|database)\b",
 ]
 _RE = re.compile("|".join(f"(?:{p})" for p in _PATTERNS), re.IGNORECASE)
+
+
+def split_injection(text: str) -> tuple[str, str]:
+    """(parte legítima, fragmento con forma de instrucción). Corta en la primera marca detectada."""
+    m = _RE.search(_fold(text))
+    if not m:
+        return text, ""
+    return text[: m.start()].strip(), text[m.start():].strip()
 
 
 def _fold(text: str) -> str:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from .cifras import exact_str, score_display
 from .models import (
     CATEGORY_LABELS,
     Claim,
@@ -60,7 +61,7 @@ def build_pack(base: TopicBase) -> EvidencePack:
         if p.is_missing or p.value is None:
             continue
         pack.items[p.id] = {
-            "value": f"{p.value:g}",
+            "value": exact_str(p.value),
             "unit": p.unit or "",
             "year": str(p.year),
             "countryIso3": p.country_iso3,
@@ -126,6 +127,8 @@ def validate_claims(claims: list[Claim], pack: EvidencePack) -> tuple[list[Claim
                 cited_text.append(ct.passage)
         if c.type in (ClaimType.hecho, ClaimType.declaracion) and cited_text and not problems:
             allowed = _numbers(" ".join(cited_text))
+            # Presentación periodística de una cifra citada (1 decimal, millones): sigue respaldada por el valor exacto.
+            allowed |= {round(x / scale, k) for x in list(allowed) for scale in (1, 1_000_000) for k in (0, 1, 2)}
             for tok in re.findall(r"\d[\d.,]*\d|\d", c.text):
                 cand = _numbers(tok)
                 if cand and not (cand & allowed):
@@ -287,7 +290,7 @@ def build_template_package(base: TopicBase, *, score: float, band: str, status: 
     if base.contradictions:
         parts.append("Hay versiones incompatibles entre fuentes; se muestran ambas y la revisión está pendiente, sin elegir una.")
     parts.append(
-        f"Evidencia {status_txt}; puntaje de atención {score:.1f} ({band}), que ordena la revisión y no demuestra verdad."
+        f"Evidencia {status_txt}; puntaje de atención {score_display(score)} ({band}), que ordena la revisión y no demuestra verdad."
     )
     parts.append("Falta verificar: " + "; ".join(pending[:3]) + ".")
     brief = " ".join(parts)

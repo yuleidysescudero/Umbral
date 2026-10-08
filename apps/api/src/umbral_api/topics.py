@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from .cifras import exact_str, fmt_es, format_value_es
 from .models import (
     CATEGORY_LABELS,
     EVIDENCE_LABELS,
@@ -159,7 +160,7 @@ def detect_contradictions(
                         published_at=a.published_at,
                     )
                 )
-        shown = ", ".join(f"{v:g}" for v in sorted(values))
+        shown = ", ".join(fmt_es(v) for v in sorted(values))
         out.append(
             Contradiction(
                 id=f"{topic_id}:cifra:{noun}",
@@ -486,10 +487,10 @@ def _supported_claims(arts: list[EvidenceArticle], inds: list[IndicatorPoint]) -
                 type=ClaimType.hecho,
                 text=(
                     f"Según el Banco Mundial, {p.indicator_name} de {p.country_name or p.country_iso3} en {p.year} fue "
-                    f"{p.value:g} ({p.unit or 'sin unidad'}); dato anual de referencia, no una medición de hoy."
+                    f"{format_value_es(p.value, p.unit)}; dato anual de referencia, no una medición de hoy."
                 ),
                 citations=[
-                    Citation(evidence_id=p.id, field="value", passage=f"{p.value:g}"),
+                    Citation(evidence_id=p.id, field="value", passage=exact_str(p.value)),
                     Citation(evidence_id=p.id, field="year", passage=str(p.year)),
                 ],
             )

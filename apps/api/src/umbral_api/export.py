@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .cifras import fmt_es, format_value_es, score_display
 from .models import CATEGORY_LABELS, GEO_LABELS, TopicDetail
 from .util import fmt_pa, now_utc
 
@@ -56,9 +57,9 @@ def export_markdown(detail: TopicDetail) -> str:
     out.append("|---|---|---|---|---|---|")
     for sc in detail.score.components:
         out.append(
-            f"| {sc.key} · {sc.label} | {sc.weight} | {sc.value:g} | {sc.points:g} | {_cell(sc.rule + ' ' + sc.justification)} | {_cell('; '.join(sc.limits))} |"
+            f"| {sc.key} · {sc.label} | {sc.weight} | {fmt_es(sc.value)} | {fmt_es(sc.points)} | {_cell(sc.rule + ' ' + sc.justification)} | {_cell('; '.join(sc.limits))} |"
         )
-    out.append(f"\n**Total: {detail.score.total:.2f} ({detail.score.band.value})**. Desempate: urgencia, luego ID.")
+    out.append(f"\n**Total: {score_display(detail.score.total)} ({detail.score.band.value})**. Desempate: urgencia, luego ID.")
     out.append("")
     out.append("## Estado de evidencia")
     out.append(f"**{detail.evidence.status_label}** — {detail.evidence.rationale}")
@@ -74,7 +75,7 @@ def export_markdown(detail: TopicDetail) -> str:
         out.append("| País | Indicador | Año | Valor | Unidad | Fuente |")
         out.append("|---|---|---|---|---|---|")
         for ip in detail.official_context.indicators:
-            val = "ausente (nulo)" if ip.is_missing else f"{ip.value:g}"
+            val = "ausente (nulo)" if ip.is_missing else format_value_es(ip.value, None)
             out.append(f"| {ip.country_iso3} | {_cell(ip.indicator_name)} | {ip.year} | {val} | {_cell(ip.unit)} | {ip.source_url or '—'} |")
     for lim in detail.official_context.limitations:
         out.append(f"- _{lim}_")

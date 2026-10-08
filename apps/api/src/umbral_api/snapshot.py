@@ -90,6 +90,7 @@ class Corpus:
     clusters: dict[str, dict[str, Any]]
     integrity: IntegrityReport
     notes: list[str] = field(default_factory=list)
+    events: list[dict[str, Any]] = field(default_factory=list)  # USGS (events.geojson): sismos, no daños
 
     @property
     def counts(self) -> dict[str, int]:
@@ -259,6 +260,22 @@ def _semantic_clusters(path: Path, manifest: dict[str, Any], clusters_raw: list[
     return rows
 
 
+def _read_events(path: Path) -> list[dict[str, Any]]:
+    """Sismos USGS del paquete (propiedades de cada Feature). Sin archivo o mal formado: lista vacía."""
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    out = []
+    for f in data.get("features") or []:
+        p = dict((f or {}).get("properties") or {})
+        if p.get("id") and isinstance(p.get("magnitude"), (int, float)) and parse_dt(p.get("time")):
+            out.append(p)
+    return out
+
+
 def load_corpus(settings: Settings) -> Corpus:
     path = resolve_snapshot_dir(settings)
     manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
@@ -266,6 +283,7 @@ def load_corpus(settings: Settings) -> Corpus:
     preds_raw = read_jsonl(path / "predictions.jsonl")
     clusters_raw = read_jsonl(path / "clusters.jsonl")
     indicators_raw = read_jsonl(path / "indicators.jsonl")
+    events = _read_events(path / "events.geojson")
     qr_path = path / "quality_report.json"
     quality = json.loads(qr_path.read_text(encoding="utf-8")) if qr_path.exists() else None
 
@@ -416,4 +434,5 @@ def load_corpus(settings: Settings) -> Corpus:
         clusters=clusters,
         integrity=integrity,
         notes=notes,
+        events=events,
     )
