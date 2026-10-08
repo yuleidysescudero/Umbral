@@ -72,7 +72,19 @@ from .providers import (
 )
 from .queries import QueryEngine
 from .retrieval import Doc, SearchIndex
-from .scoring import BANDS, CHANGELOG, RULE_TEXT, RULE_TEXT_V2, RULES_VERSION, WEIGHTS, ScoreInputs, base_rules_version, normalization, score_topic, sort_key
+from .scoring import (
+    BANDS,
+    CHANGELOG,
+    RULE_TEXT,
+    RULE_TEXT_V2,
+    RULES_VERSION,
+    WEIGHTS,
+    ScoreInputs,
+    base_rules_version,
+    normalization,
+    score_topic,
+    sort_key,
+)
 from .snapshot import Corpus, load_corpus
 from .storage import CaseRecord, PublicGeminiCounter, Repository, build_repository
 from .topics import (

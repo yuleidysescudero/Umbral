@@ -307,7 +307,7 @@ class ContradictionVersion(ApiModel):
     scope: str
     outlet: str
     published_at: datetime | None = None
-    detected_at: datetime | None = Field(None, description="Fecha de detección (cuando no hay fecha de publicación)")
+    detected_at: datetime | None = Field(default=None, description="Fecha de detección (cuando no hay fecha de publicación)")
 
 
 class Contradiction(ApiModel):

@@ -235,20 +235,20 @@ class QueryEngine:
         if guilt and not _RE_LIST_PROFILING.search(fold(q)):
             # «¿Es verdad que X es culpable?»: se busca el hecho publicado y se presenta como atribución, nunca como veredicto.
             topic_q = _RE_GUILT_STRIP.sub(" ", q).strip(" ¿?")
-            inner = self._busqueda(req.model_copy(update={"question": topic_q}), None, t0) if len(tokenize(topic_q)) >= 1 else None
-            first = next((c for c in (inner.citations if inner else []) if c.evidence_id in self.corpus.articles), None)
+            guilt_resp = self._busqueda(req.model_copy(update={"question": topic_q}), None, t0) if len(tokenize(topic_q)) >= 1 else None
+            first = next((c for c in (guilt_resp.citations if guilt_resp else []) if c.evidence_id in self.corpus.articles), None)
             source = self.corpus.articles[first.evidence_id].outlet if first else "la fuente que lo publique"
             notice = (
                 "Umbral no determina culpabilidad ni verdad. Lo publicado es una atribución: «señalado por…» "
                 f"según {source}. La responsabilidad penal solo la determina un tribunal."
             )
-            if inner is None or inner.answer_status == AnswerStatus.abstencion:
+            if guilt_resp is None or guilt_resp.answer_status == AnswerStatus.abstencion:
                 return self._abstain(req, intent, t0, notice + " Además, no hay en el corpus una nota que respalde el hecho consultado.",
                                      ["Pregunta de culpabilidad: se responde solo con atribuciones publicadas."])
-            inner.question = req.question
-            inner.answer = notice + "\n\n" + inner.answer
-            inner.warnings = ["Pregunta de culpabilidad: se muestran atribuciones publicadas, no un veredicto."] + inner.warnings
-            return inner
+            guilt_resp.question = req.question
+            guilt_resp.answer = notice + "\n\n" + guilt_resp.answer
+            guilt_resp.warnings = ["Pregunta de culpabilidad: se muestran atribuciones publicadas, no un veredicto."] + guilt_resp.warnings
+            return guilt_resp
         if looks_like_profiling(q):
             return self._abstain(
                 req, intent, t0,
@@ -850,7 +850,7 @@ def _ind_text(p: IndicatorPoint) -> str:
 
 def _ind_cites(p: IndicatorPoint) -> list[QueryCitation]:
     return [
-        QueryCitation(evidence_id=p.id, field="value", passage=exact_str(p.value), title=_ind_text(p), url=p.source_url),
+        QueryCitation(evidence_id=p.id, field="value", passage=exact_str(p.value) if p.value is not None else "", title=_ind_text(p), url=p.source_url),
         QueryCitation(evidence_id=p.id, field="year", passage=str(p.year), title=_ind_text(p), url=p.source_url),
     ]
 
