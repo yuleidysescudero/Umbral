@@ -307,7 +307,7 @@ class Services:
             headline_only=True,
             is_recirculation=base.is_recirculation,
             relevance_reason=next((c.justification for c in score.components if c.key == "R"), ""),
-            out_of_scope=base.category == Category.indeterminado,
+            out_of_scope=base.out_of_scope,
             needs_investigation=needs,
             top_reason=reason,
             tvn_gap=base.independent >= 2 and not any(a.is_tvn for a in base.articles),
@@ -472,8 +472,8 @@ class Services:
             applied["tvnGap"] = True
         out_count = 0
         if scope != "all" and category != "indeterminado":
-            out_count = sum(1 for r in rows if r[0].category == Category.indeterminado)
-            rows = [r for r in rows if r[0].category != Category.indeterminado]
+            out_count = sum(1 for r in rows if r[0].out_of_scope)
+            rows = [r for r in rows if not r[0].out_of_scope]
         total = len(rows)
         items = []
         for i, (b, sc, rec) in enumerate(rows[:limit], 1):

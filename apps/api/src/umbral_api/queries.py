@@ -572,9 +572,8 @@ class QueryEngine:
         """«Dame el resumen de economía de esta semana»: categoría y periodo son filtros, no términos de búsqueda."""
         f = fold(req.question)
         cat, period = _category(f), _period(f)
-        rows = [t for t in agenda if cat is None or t.category.value == cat]
-        if cat is None:
-            rows = [t for t in rows if not t.out_of_scope]
+        # Fuera de alcance (indeterminado o deportes) no entra en ningún resumen, tampoco en «resumen de economía».
+        rows = [t for t in agenda if (cat is None or t.category.value == cat) and not t.out_of_scope]
         undated = 0
         by_detection: set[str] = set()
         if period is not None:

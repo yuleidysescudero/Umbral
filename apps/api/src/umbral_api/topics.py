@@ -58,6 +58,26 @@ COUNTRY_KEYWORDS = {
     "GTM": ["guatemala", "guatemalteco"],
 }
 
+# Deportes: fuera del alcance del reto aunque Laya los clasifique en una de las 6 categorías («Copa Kirin» → economía).
+# Las palabras ambiguas solo cuentan con contexto deportivo: «recta final», «lugar mundial», «Banco Mundial»,
+# «Copa Airlines», «partido político» o «selección de personal» no son deporte.
+_SPORTS = re.compile(
+    r"\b(penal(es)?|penaltis?|penaltie?s|tanda de penales|gol(es)?|golead\w*|semifinal(es)?|cuartos de final|"
+    r"(la|gran|en la|a la) final\b(?! (de|del) (ano|mes|plazo|informe|proceso))|"
+    r"copa (?!airlines|holdings)[a-z]+|liga\b|seleccion (nacional|mayor|panamena|de futbol|sub|de (panama|ecuador|"
+    r"costa rica|colombia|mexico|japon|argentina|brasil|estados unidos))\w*|la seleccion\b(?! de (personal|candidatos|"
+    r"proveedores))|partido (amistoso|de futbol|ante|contra|frente)\b|torneo\w*|eliminatoria\w*|jugador(es|as?)?|"
+    r"futbol\w*|amistoso|mundial (de futbol|sub)|copa mundial|mundialista\w*|director tecnico)\b"
+    r"|\b\d+\s*-\s*\d+\s*\(\s*\d+\s*-\s*\d+\s*\)"  # marcador con tanda de penales: «0 - 0 (5 - 4)»
+)
+_SPORTS_RAW = re.compile(r"\bDT\b")  # «DT» solo en mayúsculas (director técnico)
+
+
+def is_sports_title(title: str) -> bool:
+    """¿El titular es deportivo? Palabras con contexto; sin inferir nada del resto del tema."""
+    return bool(_SPORTS.search(fold(title)) or _SPORTS_RAW.search(title))
+
+
 _NUM_NOUN = re.compile(r"(\d[\d.,]*)\s*(%|[a-záéíóúñ]+)", re.IGNORECASE)
 
 
@@ -106,6 +126,20 @@ class TopicBase:
     @property
     def usable_articles(self) -> list[EvidenceArticle]:
         return [a for a in self.articles if not a.suspicious_instructions]
+
+    @property
+    def is_sports(self) -> bool:
+        """Tema deportivo: el titular visible o la mayoría de sus notas son deportivas (fuera del alcance del reto)."""
+        titles = [a.title for a in self.usable_articles]
+        if not titles:
+            return False
+        hits = sum(1 for t in titles if is_sports_title(t))
+        return is_sports_title(self.display_title) or hits * 2 >= len(titles)
+
+    @property
+    def out_of_scope(self) -> bool:
+        """Fuera del alcance de las 6 categorías: indeterminado según Laya, o deportes aunque Laya les dé categoría."""
+        return self.category == Category.indeterminado or self.is_sports
 
 
 def _num(s: str) -> float | None:

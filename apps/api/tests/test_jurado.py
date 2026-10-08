@@ -264,3 +264,52 @@ def test_temas_relacionados_traen_titulo(real):
     for t in r["relatedTopics"]:
         assert t["title"] and not t["title"].startswith("evt_")
         assert t["title"] == real.svc.bases[t["id"]].display_title
+
+
+# ---------------------------------------------------------------- 7. deportes fuera de alcance
+DEPORTES = ("Panamá cae en penales ante Nueva Zelanda", "Japón elimina a la Ecuador de Gallardo")
+
+
+def _titles(items):
+    return [t["title"] for t in items]
+
+
+def test_deportes_fuera_de_la_agenda(real):
+    def agenda(**kw):
+        return real.svc.list_topics("jurado", limit=1000, category=None, evidence=None, band=None, review_status=None,
+                                    q=None, include_components=False, **kw).items
+
+    items = agenda()
+    for name in DEPORTES:
+        assert not any(name in t.title for t in items), name
+    for name in DEPORTES:
+        t = next(t for t in agenda(scope="all") if name in t.title)
+        assert t.out_of_scope is True, t.title  # sigue visible en «todos», marcado fuera de alcance
+    top = real.get("/api/v1/topics", params={"limit": 100}).json()["items"]
+    assert not any(n in t["title"] for t in top for n in DEPORTES)
+
+
+@pytest.mark.parametrize("q", ["resumen de economía de esta semana", "Qué cinco temas merecen revisión para la agenda de Panamá",
+                               "Qué temas no ha cubierto TVN"])
+def test_deportes_fuera_de_resumenes_y_agenda_del_asistente(real, q):
+    r = ask(real, q)
+    for name in DEPORTES:
+        assert name not in r["answer"], (q, name)
+
+
+@pytest.mark.parametrize("title,sport", [
+    ("Panamá cae en penales ante Nueva Zelanda en las semifinales de la Copa Kirin", True),
+    ("0 - 0 ( 5 - 4 ): Japón elimina a la Ecuador de Gallardo", True),
+    ("El DT de la selección convoca a 23 jugadores para la eliminatoria", True),
+    ("Gol de último minuto en el partido ante Costa Rica por la Liga", True),
+    ("Registro de Buques de Panamá cae al tercer lugar mundial por tonelaje de arqueo bruto", False),
+    ("España llega a la recta final antes del invierno con menos gas almacenado", False),
+    ("Banco Mundial mejora la proyección de crecimiento de Panamá", False),
+    ("Copa Airlines anuncia nueva ruta a Lima", False),
+    ("El partido Realizando Metas presenta su candidato", False),
+    ("Proceso de selección de personal en la ACP", False),
+])
+def test_detector_de_titulares_deportivos(title, sport):
+    from umbral_api.topics import is_sports_title
+
+    assert is_sports_title(title) is sport
