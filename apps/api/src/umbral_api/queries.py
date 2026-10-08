@@ -441,6 +441,12 @@ class QueryEngine:
         q, _ = self.index.expand_query(question)
         return {t for t in q if t not in skip and not t.isdigit()}
 
+    @staticmethod
+    def _covers(title: str, content: set[str]) -> bool:
+        """¿El titular contiene las palabras de contenido? Todas si son 1–2; 2/3 si son más. Sin corrección difusa."""
+        need = -(-2 * len(content) // 3)
+        return len(set(tokenize(title)) & content) >= need
+
     # ------------------------------------------------------------------ intents
     def _provenance_example(self, scope: TopicBase | None) -> tuple[TopicBase, str, list] | None:
         """Tema real donde una agencia replicada cuenta una vez: (tema, clave de la agencia, sus notas).
@@ -800,7 +806,10 @@ class QueryEngine:
                 missing=[f"Evidencia que mencione: {', '.join(self._as_written(req.question, set(qtoks) - set(best.matched)))}."],
             )
         # La cobertura se decide con BM25; después se suman paráfrasis y versiones en otro idioma (RRF).
+        lexical_ids = {h.doc.doc_id for h in hits}
         hits, semantic = self._semantic_fuse(hits, restrict)
+        # Paráfrasis/traducciones que trajeron los vecinos semánticos de un resultado fuerte (no coincidencias léxicas).
+        semantic_ids = {h.doc.doc_id for h in hits} - lexical_ids
         hit_models = [self._hit_model(h) for h in hits[: req.limit]]
         # ¿pide una cifra? solo se responde si algún titular relevante la contiene
         wants_number = bool(_RE_NUMERIC.search(fold(req.question)))
@@ -848,6 +857,19 @@ class QueryEngine:
                     hits=hit_models, coverage=coverage, matched=best.matched, warnings=warnings, missing=[need],
                 )
 
+        # Antes de citar: una nota léxica debe contener las palabras de contenido de la consulta (todas si son 1–2,
+        # 2/3 si son más), con tokens exactos: «reforma eléctrica» no se responde con «reformas electorales».
+        citable = [h for h in usable if not content or h.doc.doc_id in semantic_ids
+                   or self._covers(self.corpus.articles[h.doc.doc_id].title, content)]
+        if not citable and not ind_hits:
+            return self._abstain(
+                req, QueryIntent.busqueda, t0,
+                "ningún titular recuperado contiene las palabras de contenido de la consulta "
+                f"({', '.join(self._as_written(req.question, content)) or '—'}); una coincidencia parcial no se cita.",
+                hits=hit_models, coverage=coverage, matched=best.matched, warnings=warnings,
+                missing=[f"Evidencia que mencione: {', '.join(self._as_written(req.question, content))}."],
+            )
+
         # agrupar por cluster; tomar el cluster del mejor artículo utilizable
         lines: list[str] = []
         cites: list[QueryCitation] = []
@@ -856,8 +878,8 @@ class QueryEngine:
         status = AnswerStatus.respondida if coverage >= 0.75 else AnswerStatus.parcial
         missing: list[str] = []
         used_clusters: list[str] = []
-        usable_ids = {h.doc.doc_id for h in usable}
-        for h in usable[:4]:
+        usable_ids = {h.doc.doc_id for h in citable}
+        for h in citable[:4]:
             a = self.corpus.articles[h.doc.doc_id]
             if a.cluster_id and a.cluster_id not in used_clusters:
                 used_clusters.append(a.cluster_id)
@@ -865,13 +887,13 @@ class QueryEngine:
             base = self.bases.get(cid)
             if base is None:
                 continue
-            related.append(cid)
             seen_keys: set[str] = set()
+            n_cites = len(cites)
             for a in base.usable_articles:
                 if a.origin_key in seen_keys:
                     continue
-                if content and not (set(tokenize(a.title)) & content) and a.id not in usable_ids:
-                    continue  # mismo grupo, pero sin un término de la pregunta: no se cita
+                if content and not self._covers(a.title, content) and a.id not in (usable_ids & semantic_ids):
+                    continue  # mismo grupo, pero sin las palabras de contenido de la pregunta: no se cita
                 seen_keys.add(a.origin_key)
                 if len(seen_keys) > 3:
                     break
@@ -882,6 +904,9 @@ class QueryEngine:
                 )
                 lines.append(f"- {a.outlet} ({when}): «{a.title}» [{a.id}]")
                 cites.append(QueryCitation(evidence_id=a.id, field="title", passage=a.title, title=a.title, url=a.url))
+            if len(cites) == n_cites:
+                continue  # ninguna nota del grupo se puede citar: el grupo no entra en la respuesta
+            related.append(cid)
             note = (
                 f"  ({len(base.usable_articles)} nota(s), {base.independent} procedencia(s) independiente(s); "
                 f"evidencia {base.system_status.value})"

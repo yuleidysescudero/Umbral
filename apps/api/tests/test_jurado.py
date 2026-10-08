@@ -103,3 +103,33 @@ def test_casos_del_jurado_en_el_benchmark():
         assert q in by_q, q
         assert by_q[q]["mustAbstain"] is False
         assert by_q[q]["relevantEvidenceIds"]
+
+
+# ---------------------------------------------------------------- 2. citas sin relación
+def test_reforma_electrica_no_cita_reformas_electorales(real):
+    r = ask(real, "¿Qué pasó con la reforma eléctrica?")
+    assert r["answerStatus"] != "abstencion", r["answer"]
+    passages = [c["passage"].lower() for c in r["citations"]] + [c["title"].lower() for c in r["citations"]]
+    assert passages
+    assert not any("electoral" in p for p in passages), passages
+    assert "electoral" not in r["answer"].lower()
+    assert any("eléctrica" in p for p in passages)
+
+
+def test_cita_exige_las_palabras_de_contenido(real):
+    # Cada artículo citado en una búsqueda comparte las palabras de contenido de la consulta (sin stemming difuso).
+    from umbral_api.retrieval import tokenize
+
+    for q in ("¿Qué pasó con la reforma eléctrica?", "tránsitos del Canal de Panamá"):
+        r = ask(real, q)
+        engine = real.svc.engine
+        content = engine._content_terms(q)
+        need = -(-2 * len(content) // 3)
+        for c in r["citations"]:
+            if not c["evidenceId"].startswith("art_"):
+                continue
+            art = real.svc.corpus.articles[c["evidenceId"]]
+            if "semantico" in r["retrieval"]["method"] and art.language == "en":
+                continue  # traducción traída por los vecinos semánticos de un resultado léxico fuerte
+            title = art.title
+            assert len(set(tokenize(title)) & content) >= need, (q, title, content)
