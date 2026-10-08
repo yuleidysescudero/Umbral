@@ -5,7 +5,8 @@ export type Route =
   | { view: 'ficha'; topicId: string | null }
   | { view: 'borradores'; topicId: string | null }
   | { view: 'fuentes' }
-  | { view: 'mesa' };
+  | { view: 'mesa' }
+  | { view: 'etiquetar' };
 
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -19,6 +20,8 @@ export function parseHash(hash: string): Route {
       return { view: 'fuentes' };
     case 'mesa':
       return { view: 'mesa' };
+    case 'etiquetar':
+      return { view: 'etiquetar' };
     default:
       return { view: 'agenda' };
   }
@@ -34,6 +37,8 @@ export function toHash(r: Route): string {
       return '#/fuentes';
     case 'mesa':
       return '#/mesa';
+    case 'etiquetar':
+      return '#/etiquetar';
     default:
       return '#/agenda';
   }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { Bot, ChevronDown, Database, FileSearch, FlaskConical, ListOrdered, LogOut, PenLine, Users, WifiOff } from 'lucide-react';
+import { Bot, ChevronDown, Database, FileSearch, FlaskConical, ListOrdered, LogOut, PenLine, Tags, Users, WifiOff } from 'lucide-react';
 import type { BootProgress, UmbralApi } from '../lib/api/client';
 import { resolveApi } from '../lib/api';
 import { initAuth, type AuthState } from '../lib/auth';
@@ -17,6 +17,7 @@ import { Ficha } from './views/Ficha';
 import { Drafts } from './views/Drafts';
 import { Sources } from './views/Sources';
 import { Mesa } from './views/Mesa';
+import { Etiquetar } from './views/Etiquetar';
 import { SessionGate } from './SessionGate';
 import { guardarSesion, leerSesion, ROLES, type Session } from '../lib/session';
 import { Assistant } from './Assistant';
@@ -30,7 +31,10 @@ const NAV: { view: Route['view']; label: string; icon: typeof ListOrdered; testI
 ];
 // Builds con sesión por rol (MEGA en Vercel): entrada sin contraseña y mesa compartida del equipo.
 export const SESSION_GATE = String(import.meta.env.PUBLIC_SESSION_GATE ?? '').trim() === '1';
-const NAV_MESA = { view: 'mesa' as const, label: 'Mesa', icon: Users, testId: 'nav-mesa' };
+const NAV_EXTRA = [
+  { view: 'mesa' as const, label: 'Mesa', icon: Users, testId: 'nav-mesa' },
+  { view: 'etiquetar' as const, label: 'Etiquetar', icon: Tags, testId: 'nav-etiquetar' },
+];
 
 function SessionChip() {
   const { session, salir } = useApp();
@@ -176,7 +180,7 @@ function Shell({ assistantOpen, setAssistantOpen, seed }: { assistantOpen: boole
             Umbral<span className="text-amber-600">.</span>
           </a>
           <nav aria-label="Vistas principales" className="comic-tabbar flex gap-1 md:justify-center">
-            {(SESSION_GATE ? [...NAV, NAV_MESA] : NAV).map(({ view, label, icon: Ico, testId }) => {
+            {(SESSION_GATE ? [...NAV, ...NAV_EXTRA] : NAV).map(({ view, label, icon: Ico, testId }) => {
               const active = route.view === view;
               return (
                 <a
@@ -186,7 +190,7 @@ function Shell({ assistantOpen, setAssistantOpen, seed }: { assistantOpen: boole
                   aria-current={active ? 'page' : undefined}
                   onClick={(e) => {
                     e.preventDefault();
-                    go(view === 'agenda' || view === 'fuentes' || view === 'mesa' ? { view } : { view, topicId: lastTopic.current });
+                    go(view === 'agenda' || view === 'fuentes' || view === 'mesa' || view === 'etiquetar' ? { view } : { view, topicId: lastTopic.current });
                   }}
                   className={`comic-nav inline-flex min-h-11 shrink-0 items-center gap-1.5 px-3 py-1.5 text-sm font-semibold ${
                     active ? 'border-amber-600 bg-amber-100 text-ink' : 'border-transparent text-ink-2 hover:bg-sunk'
@@ -229,6 +233,7 @@ function Shell({ assistantOpen, setAssistantOpen, seed }: { assistantOpen: boole
           {route.view === 'borradores' && <Drafts />}
           {route.view === 'fuentes' && <Sources />}
           {route.view === 'mesa' && <Mesa />}
+          {route.view === 'etiquetar' && <Etiquetar />}
         </div>
         <footer className="mt-8 border-t border-rule pt-3 text-xs text-ink-3">
           Umbral prioriza la atención editorial y prepara borradores para revisión humana. No publica, no etiqueta noticias como verdaderas o falsas y no sustituye el criterio del equipo.
