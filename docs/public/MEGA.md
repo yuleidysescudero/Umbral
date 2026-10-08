@@ -72,7 +72,7 @@ pruebas (incluye el mapeo estado → expresión de Mini IA y los límites del co
 visibles a 1280×720, navegación sin solapes a 1024–1440 px, **axe-core sin violaciones serious/critical** en claro y
 oscuro, estados de Mini IA para respondida/abstención/inyección, reducir movimiento). Benchmark de desarrollo (50
 consultas, 10 adversariales nuevas): abstención correcta 14/14, abstención incorrecta 0/20, adversariales **17/17**,
-0 fallos (`eval/results/benchmark-dev-cfa338b6-qa-tvn.json`).
+0 fallos (`eval/results/benchmark-dev-cfa338b6-qa-tvn.json`). Suite de integración y E2E existente (`pytest tests`, como en CI): **200 aprobadas, 13 omitidas, 0 fallos**, actualizada al masthead de 3 zonas, los filtros plegados y el guion separado.
 
 Límite honesto de 3.4: la API de Vercel no carga PyTorch, así que la pregunta no se convierte en embedding en vivo; la
 parte semántica usa los vecinos precalculados de los resultados de BM25. Sin el archivo de vecinos, todo cae a BM25 (T10).
