@@ -306,6 +306,7 @@ def create_app(settings: Settings | None = None, *, build_services: bool = True,
             description="in_scope (defecto): excluye temas de categoría indeterminada (fuera del alcance temático); "
             "all: los incluye. La respuesta trae outOfScopeCount.",
         ),
+        tvn_gap: bool = Query(False, alias="tvnGap", description="Solo temas que otros medios reportan (≥ 2 procedencias) y TVN no"),
     ) -> TopicsResponse:
         return svc.list_topics(
             user,
@@ -317,6 +318,7 @@ def create_app(settings: Settings | None = None, *, build_services: bool = True,
             q=q,
             include_components=include_components,
             scope=scope,
+            tvn_gap=tvn_gap,
         )
 
     @api.get(

@@ -146,6 +146,7 @@ export class MockApi implements UmbralApi {
     const all = MOCK_SPECS.map((s) => buildDetail(s, this.getCaseSync(`case-${s.id}`)).summary);
     let items = all
       .filter((t) => f.scope === 'all' || t.category !== 'indeterminado')
+      .filter((t) => !f.tvnGap || t.tvnGap)
       .filter((t) => !f.category || t.category === f.category)
       .filter((t) => !f.evidence || t.evidenceStatus === f.evidence)
       .filter((t) => !f.band || t.band === f.band)

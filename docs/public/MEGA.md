@@ -67,8 +67,8 @@ R/I/U/N/E es una barra apilada con «Ver cómo se calculó».
 | 3.11 Etiquetas contaminables | El Jurado no ve «Etiquetar»; cada etiqueta guarda rol y sesión; el importador acepta solo una lista blanca (`--etiquetadores`) e informa los descartes; migración RLS `supabase/etiquetas_integridad.sql` (solo inserción, Jurado bloqueado, límites de tamaño) | `test_el_jurado_no_ve_etiquetar` |
 | 3.12 README | Badges y `git clone` apuntan a `yuleidysescudero/Umbral` (rama `mega`) y la demo está en la primera línea | — |
 
-Verificación: API 322 pruebas (incluye 36 nuevas en `apps/api/tests/test_qa_tvn.py`, sobre el snapshot real), web 73
-pruebas (incluye el mapeo estado → expresión de Mini IA), E2E nuevas `tests/e2e/test_tvn_identidad.py` (temas #1 y #2
+Verificación: API 323 pruebas (incluye 37 nuevas en `apps/api/tests/test_qa_tvn.py`, sobre el snapshot real), web 74
+pruebas (incluye el mapeo estado → expresión de Mini IA y los límites del copy para redes), E2E nuevas `tests/e2e/test_tvn_identidad.py` (temas #1 y #2
 visibles a 1280×720, navegación sin solapes a 1024–1440 px, **axe-core sin violaciones serious/critical** en claro y
 oscuro, estados de Mini IA para respondida/abstención/inyección, reducir movimiento). Benchmark de desarrollo (50
 consultas, 10 adversariales nuevas): abstención correcta 14/14, abstención incorrecta 0/20, adversariales **17/17**,
@@ -76,6 +76,18 @@ consultas, 10 adversariales nuevas): abstención correcta 14/14, abstención inc
 
 Límite honesto de 3.4: la API de Vercel no carga PyTorch, así que la pregunta no se convierte en embedding en vivo; la
 parte semántica usa los vecinos precalculados de los resultados de BM25. Sin el archivo de vecinos, todo cae a BM25 (T10).
+
+### Funciones para TVN (fase 4)
+
+- **«TVN aún no lo cubre»**: insignia «Oportunidad: otros medios lo reportan, TVN no» en los temas con ≥ 2 procedencias
+  independientes y ninguna nota de `tvn-2.com`, y un filtro propio en la Agenda (`tvnGap`, también en la API).
+- **Modo demo para el jurado** (en el asistente): cuatro botones con las pruebas dinámicas de la pág. 11 — de dónde viene
+  una cifra y de qué año, cinco medios que replican una agencia, sin evidencia / inyección, y una decisión con una prueba
+  fallida y su corrección (T05 real: 32 vs 33 tránsitos).
+- **Copy para redes de TVN** en Borradores: variantes para X (280), Instagram (2200) y TikTok (150 caracteres), derivadas
+  solo del copy validado y siempre marcadas «Borrador, requiere revisión».
+- **Pendiente:** «Qué cambió desde el corte anterior» necesita un segundo snapshot; hoy el paquete solo trae uno
+  (`20261007-cfa338b6`), así que no se muestra una comparación inventada.
 
 ### Capturas
 

@@ -319,6 +319,7 @@ export function buildDetail(spec: Spec, caseView: TopicDetail['case']): TopicDet
       score: score.total,
       scoreDisplay: score.display,
       titleLanguage: 'es',
+      tvnGap: false,
       band: score.band,
       scoreComponents: score.components,
       evidenceStatus: spec.evidence,

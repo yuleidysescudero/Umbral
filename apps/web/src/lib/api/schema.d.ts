@@ -486,6 +486,11 @@ export interface components {
              * @enum {string}
              */
             scope: "in_scope" | "all";
+            /**
+             * Tvngap
+             * @default false
+             */
+            tvnGap: boolean;
         };
         /**
          * AnswerStatus
@@ -2385,6 +2390,12 @@ export interface components {
              * @default
              */
             topReason: string;
+            /**
+             * Tvngap
+             * @description Oportunidad: ≥ 2 procedencias independientes lo reportan y ninguna nota es de TVN (tvn-2.com)
+             * @default false
+             */
+            tvnGap: boolean;
             /** Urgency */
             urgency: number;
         };
@@ -2483,6 +2494,12 @@ export interface components {
              * @default
              */
             topReason: string;
+            /**
+             * Tvngap
+             * @description Oportunidad: ≥ 2 procedencias independientes lo reportan y ninguna nota es de TVN (tvn-2.com)
+             * @default false
+             */
+            tvnGap: boolean;
             /** Urgency */
             urgency: number;
         };
@@ -4168,6 +4185,8 @@ export interface operations {
                 includeComponents?: boolean;
                 /** @description in_scope (defecto): excluye temas de categoría indeterminada (fuera del alcance temático); all: los incluye. La respuesta trae outOfScopeCount. */
                 scope?: string;
+                /** @description Solo temas que otros medios reportan (≥ 2 procedencias) y TVN no */
+                tvnGap?: boolean;
             };
             header?: never;
             path?: never;

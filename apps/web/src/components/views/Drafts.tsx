@@ -32,6 +32,7 @@ import { fmtDateTime, fmtNumber, pct } from '../../lib/format';
 import { useEntrance } from '../../lib/useMotion';
 import { useApp } from '../context';
 import { compartirDecision } from '../../lib/mesa';
+import { socialVariants } from '../../lib/social';
 import {
   Button,
   Card,
@@ -403,6 +404,18 @@ function DraftEditor({ detail, draft, caseView, reviewer }: { detail: TopicDetai
             <textarea id={idC} data-testid="draft-copy" rows={3} className={inputCls} value={form.copy} onChange={(e) => set('copy', e.target.value)} />
             <Counter n={live.copy} max={COPY_MAX} testId="draft-copy-count" />
           </Field>
+          <div className="space-y-1.5" data-testid="social-variants">
+            <p className="kicker">Copy para redes de TVN · borrador, requiere revisión</p>
+            {socialVariants(form.copy).map((v) => (
+              <div key={v.red} className="rounded-lg border border-rule-strong bg-paper p-2 text-sm" data-testid={`social-${v.red.toLowerCase()}`}>
+                <p className="flex justify-between text-xs font-bold text-ink-2">
+                  <span>{v.red}</span>
+                  <span className="tabular-nums">{v.texto.length}/{v.limite} caracteres</span>
+                </p>
+                <p className="whitespace-pre-line">{v.texto}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </Card>
 

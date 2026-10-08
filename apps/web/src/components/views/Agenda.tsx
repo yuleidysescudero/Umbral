@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ArrowRight, ChevronDown, FileSearch, GitCompare, Newspaper, Repeat, Search, ShieldAlert, SlidersHorizontal, TriangleAlert, X } from 'lucide-react';
+import { ArrowRight, ChevronDown, FileSearch, GitCompare, Newspaper, Radio, Repeat, Search, ShieldAlert, SlidersHorizontal, TriangleAlert, X } from 'lucide-react';
 import type { Category, EvidenceStatus, ReviewStatus, ScoreBand, TopicFilters, TopicSummary } from '../../lib/api/types';
 import { useRules, useTopics } from '../../lib/hooks';
 import { BAND_LABEL, CATEGORY_LABEL, EVIDENCE_LABEL, REVIEW_LABEL } from '../../lib/labels';
@@ -65,6 +65,11 @@ export function TopicFlags({ t }: { t: TopicSummary }) {
       {t.hasContradictions && (
         <Pill tone="bad" icon={GitCompare}>
           Versiones contradictorias
+        </Pill>
+      )}
+      {t.tvnGap && (
+        <Pill tone="info" icon={Radio} testId="tvn-gap" title="Dos o más procedencias independientes lo reportan y ninguna nota es de TVN (tvn-2.com).">
+          Oportunidad: otros medios lo reportan, TVN no
         </Pill>
       )}
       {t.hasSuspiciousSource && (
@@ -188,6 +193,7 @@ export function Agenda() {
   const [reviewStatus, setReviewStatus] = useState<ReviewStatus | ''>('');
   const [limit, setLimit] = useState(5);
   const [scope, setScope] = useState<'in_scope' | 'all'>('in_scope');
+  const [tvnGap, setTvnGap] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const rules = useRules();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -198,9 +204,9 @@ export function Agenda() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const filters: TopicFilters = { q: debounced, category, evidence, band, reviewStatus, limit, scope };
+  const filters: TopicFilters = { q: debounced, category, evidence, band, reviewStatus, limit, scope, tvnGap };
   const { data, error, isLoading, isFetching, refetch } = useTopics(filters);
-  const hasFilters = Boolean(category || evidence || band || reviewStatus || debounced || scope === 'all');
+  const hasFilters = Boolean(category || evidence || band || reviewStatus || debounced || scope === 'all' || tvnGap);
   const facets = data?.facets ?? {};
   const activeFilters = [category, evidence, band, reviewStatus].filter(Boolean).length + (scope === 'all' ? 1 : 0);
 
@@ -210,7 +216,7 @@ export function Agenda() {
   const revealMore = useRevealNew(
     rootRef,
     data?.items.map((t) => t.id) ?? [],
-    [debounced, category, evidence, band, reviewStatus, scope].join('|'),
+    [debounced, category, evidence, band, reviewStatus, scope, tvnGap].join('|'),
   );
 
   return (
@@ -250,6 +256,21 @@ export function Agenda() {
             )}
           </div>
 
+        <Button
+          className="shrink-0"
+          aria-pressed={tvnGap}
+          variant={tvnGap ? 'primary' : 'secondary'}
+          icon={Radio}
+          onClick={() => {
+            setTvnGap(!tvnGap);
+            setLimit(5);
+          }}
+          data-testid="filter-tvn-gap"
+          title="Temas que otros medios reportan (≥ 2 procedencias independientes) y TVN todavía no"
+        >
+          <span className="hidden sm:inline">TVN aún no lo cubre</span>
+          <span className="sm:hidden">Sin TVN</span>
+        </Button>
         <Button
           className="shrink-0 justify-between"
           aria-expanded={filtersOpen}
@@ -331,6 +352,7 @@ export function Agenda() {
                 setBand('');
                 setReviewStatus('');
                 setScope('in_scope');
+                setTvnGap(false);
               }}
               data-testid="filters-clear"
             >

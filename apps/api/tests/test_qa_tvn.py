@@ -270,3 +270,14 @@ def test_que_paso_con_un_tema_es_busqueda_no_resumen(real):
 def test_exact_match_stays_first_after_semantic_fusion(real):
     r = ask(real, "¿Qué pasó con la reforma eléctrica?")
     assert r["citations"][0]["evidenceId"] == "art_2dcbf84e2b74a8b4", r["answer"][:400]
+
+
+# ---------------------------------------------------------------- fase 4: «TVN aún no lo cubre»
+@needs_real
+def test_tvn_gap_filter_lists_topics_others_cover_and_tvn_does_not(real):
+    items = real.get("/api/v1/topics", params={"limit": 100, "scope": "all", "tvnGap": "true"}).json()["items"]
+    assert items, "debe haber oportunidades en el snapshot real"
+    for t in items:
+        assert t["tvnGap"] and t["independentProvenances"] >= 2
+        base = real.svc.bases[t["id"]]
+        assert not any(a.is_tvn for a in base.articles)

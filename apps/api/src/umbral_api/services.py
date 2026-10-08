@@ -298,6 +298,7 @@ class Services:
             out_of_scope=base.category == Category.indeterminado,
             needs_investigation=needs,
             top_reason=reason,
+            tvn_gap=base.independent >= 2 and not any(a.is_tvn for a in base.articles),
         )
 
     def _ranked(self, user: str) -> list[tuple[TopicBase, ScoreDetail, CaseRecord | None]]:
@@ -426,6 +427,7 @@ class Services:
         q: str | None,
         include_components: bool,
         scope: str = "in_scope",
+        tvn_gap: bool = False,
     ) -> TopicsResponse:
         rows = self._ranked(user)
         applied: dict[str, object] = {"limit": limit}
@@ -453,6 +455,9 @@ class Services:
             rows = [r for r in rows if (r[2].status.value if r[2] else "nuevo") == review_status]
             applied["reviewStatus"] = review_status
         applied["scope"] = scope
+        if tvn_gap:
+            rows = [r for r in rows if r[0].independent >= 2 and not any(a.is_tvn for a in r[0].articles)]
+            applied["tvnGap"] = True
         out_count = 0
         if scope != "all" and category != "indeterminado":
             out_count = sum(1 for r in rows if r[0].category == Category.indeterminado)

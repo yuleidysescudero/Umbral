@@ -63,6 +63,7 @@ class AgendaFilters(ApiModel):
     q: str | None = Field(None, max_length=500)
     include_components: bool = True
     scope: Literal["in_scope", "all"] = "in_scope"
+    tvn_gap: bool = False
 
 
 class PublicTopicRequest(ApiModel):

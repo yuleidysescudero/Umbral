@@ -153,3 +153,17 @@ def test_capturas_para_la_documentacion(browser):
             page.wait_for_timeout(700)
             page.screenshot(path=str(CAPTURAS / f"asistente-{tag}.png"))
             page.context.close()
+
+
+def test_filtro_tvn_aun_no_lo_cubre_y_modo_demo(browser):
+    page = open_app(browser, w=1440, h=900)
+    page.get_by_test_id("filter-tvn-gap").click()
+    page.wait_for_function("document.querySelector('[data-testid=filter-tvn-gap]').getAttribute('aria-pressed') === 'true'")
+    page.wait_for_function("""() => { const c = [...document.querySelectorAll('[data-testid=topic-card]')];
+      return c.length > 0 && c.every((el) => el.querySelector('[data-testid=tvn-gap]')); }""", timeout=30_000)
+    page.get_by_test_id("assistant-toggle").click()
+    page.get_by_test_id("demo-cifra").click()
+    page.wait_for_function("document.querySelectorAll('[data-testid=assistant-answer]').length > 0", timeout=60_000)
+    text = page.get_by_test_id("assistant-answer").last.inner_text()
+    assert "2023" in text and "Banco Mundial" in text
+    page.context.close()

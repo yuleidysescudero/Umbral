@@ -397,6 +397,7 @@ class TopicSummary(ApiModel):
         False, description="Prioridad alta con evidencia insuficiente: requiere investigación; no habilita publicación."
     )
     top_reason: str = ""
+    tvn_gap: bool = Field(False, description="Oportunidad: ≥ 2 procedencias independientes lo reportan y ninguna nota es de TVN (tvn-2.com)")
 
 
 class TopicsResponse(ApiModel):

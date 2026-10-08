@@ -58,6 +58,8 @@ export interface TopicFilters {
   reviewStatus?: ReviewStatus | '';
   q?: string;
   limit?: number;
+  /** Solo temas que otros medios reportan (≥ 2 procedencias) y TVN no. */
+  tvnGap?: boolean;
 }
 
 export type PublicContext = S['PublicContext'];

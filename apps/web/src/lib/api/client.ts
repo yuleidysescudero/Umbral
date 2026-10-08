@@ -212,6 +212,7 @@ export class HttpApi implements UmbralApi {
         band: f.band,
         reviewStatus: f.reviewStatus,
         q: f.q?.trim(),
+        tvnGap: f.tvnGap ? true : undefined,
         includeComponents: true,
       },
     });
