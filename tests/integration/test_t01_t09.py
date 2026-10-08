@@ -335,7 +335,7 @@ class TestT09PaqueteEditorial:
         assert pkg["publicInterestAngle"].strip()
         assert pkg["pendingVerifications"], "debe listar verificaciones pendientes"
         assert words(pkg["socialCopy"]) <= 80
-        n = words(pkg["script"])
+        n = words(pkg["script"].split("NOTAS DE PRODUCCIÓN")[0])  # QA TVN 3.8: se mide lo que se lee al aire
         assert 100 <= n <= 160, f"guion de {n} palabras (45-60 s ≈ 112-150 palabras)"
 
     def test_origen_del_borrador_identificado(self, draft):
@@ -381,7 +381,7 @@ class TestT09PaqueteEditorial:
         pkg = draft["resp"]["draft"]["package"]
         corpus = " ".join(a["title"] for a in draft["topic"]["articles"])
         corpus += " " + " ".join(str(p["value"]) for p in draft["topic"]["officialContext"]["indicators"])
-        corpus += f" {draft['topic']['score']['total']:.1f} {draft['topic']['score']['total']}"  # el puntaje se cita
+        corpus += f" {draft['topic']['score']['display']} {draft['topic']['score']['total']}"  # el puntaje se cita (un solo redondeo, QA TVN 3.1)
         text = " ".join([pkg["brief"], pkg["script"], pkg["socialCopy"]])
         text = re.sub(r"\d{4}-\d{2}-\d{2}", " ", text)  # fechas ISO tomadas de la propia evidencia
         text = re.sub(r"\[c\d+\]", " ", text)           # marcadores de cita

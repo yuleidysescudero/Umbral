@@ -254,7 +254,8 @@ h1, h2, h3, h4 { color: var(--color-ink); }
   .topic-score-box .disclosure-trigger { min-height: 1.9rem; padding: .1rem 0; }
   .agenda-filters { border-width: 0; background: transparent; padding: 0; }
 }
-.btn-compact { min-height: 2.1rem !important; padding: .2rem .5rem !important; font-size: .78rem; }
+/* Botones compactos solo con puntero fino (escritorio); en móvil conservan la zona táctil de 44 px. */
+@media (min-width: 960px) { .btn-compact { min-height: 2.1rem !important; padding: .2rem .5rem !important; font-size: .78rem; } }
 .score-legend { font-size: .68rem; gap: .1rem .55rem; }
 @media (max-width: 359px) {
   .comic-page-heading { padding: .9rem; }

@@ -108,6 +108,8 @@ def test_filtros_se_pliegan_en_movil(page: Page, stack):
 def test_filtros_forman_una_rejilla_simetrica_y_sin_texto_cortado(page: Page, stack, w):
     page.set_viewport_size({"width": w, "height": 900})
     open_app(page, stack.url)
+    tid(page, "filters-toggle").click()  # QA TVN 1.5: los filtros se pliegan también en escritorio para ver los temas
+    settle_motion(page)
     ids = ("filter-scope", "filter-category", "filter-evidence", "filter-band", "filter-review", "filters-clear")
     b = [box(page, i) for i in ids]
     row1, row2 = b[:3], b[3:]
@@ -115,9 +117,9 @@ def test_filtros_forman_una_rejilla_simetrica_y_sin_texto_cortado(page: Page, st
     assert len({round(x["y"]) for x in row2}) == 1, f"segunda fila desalineada: {[round(x['y']) for x in row2]}"
     assert len({round(x["width"]) for x in b}) <= 2, f"anchos desiguales en la rejilla: {[round(x['width']) for x in b]}"
     assert len({round(x["height"]) for x in b}) == 1, f"alturas desiguales: {[round(x['height']) for x in b]}"
-    # El buscador ocupa todo el ancho de la barra y queda sobre la rejilla.
+    # El buscador comparte fila con «TVN aún no lo cubre» y «Filtros», sobre la rejilla.
     search = box(page, "agenda-search")
-    assert search["y"] < row1[0]["y"] and search["width"] >= (row2[2]["x"] + row2[2]["width"]) - row1[0]["x"] - 40
+    assert search["y"] < row1[0]["y"] and search["width"] >= 0.45 * ((row2[2]["x"] + row2[2]["width"]) - row1[0]["x"])
     assert search["height"] >= 43.5
     assert not page.evaluate(JS_SELECT_TRUNCATED), f"menús con el texto cortado: {page.evaluate(JS_SELECT_TRUNCATED)}"
 
@@ -126,23 +128,23 @@ def test_botones_de_cada_tarjeta_tienen_el_mismo_ancho_en_movil(page: Page, stac
     page.set_viewport_size({"width": 390, "height": 844})
     open_app(page, stack.url)
     card = tid(page, "topic-card").first
-    buttons = card.locator("button")
+    buttons = card.locator("button.comic-button")  # «Ficha» y «Borradores» (el desplegable del puntaje no es una acción)
     assert buttons.count() == 2
     a, c = buttons.nth(0).bounding_box(), buttons.nth(1).bounding_box()
     assert a and c and abs(a["width"] - c["width"]) <= 1 and abs(a["y"] - c["y"]) <= 1, f"botones desiguales: {a} {c}"
 
 
-def test_estado_de_datos_plegable_en_movil_y_visible_en_escritorio(page: Page, stack):
-    page.set_viewport_size({"width": 390, "height": 844})
-    open_app(page, stack.url)
-    expect(tid(page, "snapshot-badge")).to_be_hidden()
-    tid(page, "status-toggle").click()
-    expect(tid(page, "snapshot-badge")).to_be_visible()
-    page.set_viewport_size({"width": 1440, "height": 900})
-    page.reload()
-    open_app(page, stack.url)
-    expect(tid(page, "snapshot-badge")).to_be_visible()
-    expect(tid(page, "status-toggle")).to_be_hidden()
+def test_estado_de_datos_en_una_linea_plegable(page: Page, stack):
+    """QA TVN 1.5: el estado del snapshot es una sola línea («ver detalles») en móvil y en escritorio."""
+    for w, h in ((390, 844), (1440, 900)):
+        page.set_viewport_size({"width": w, "height": h})
+        open_app(page, stack.url)
+        expect(tid(page, "snapshot-line")).to_be_visible()
+        expect(tid(page, "data-mode-banner")).to_be_visible()
+        expect(tid(page, "snapshot-badge")).to_be_hidden()
+        tid(page, "status-toggle").click()
+        expect(tid(page, "snapshot-badge")).to_be_visible()
+        page.reload()
 
 
 @pytest.mark.parametrize("w,h", [(390, 844), (320, 640)], ids=lambda v: str(v))
@@ -200,15 +202,18 @@ def test_respuesta_del_asistente_viene_organizada(page: Page, stack, w, h):
     assert page.evaluate("document.documentElement.scrollWidth") <= w
 
 
-@pytest.mark.parametrize("w", [1440, 1024, 768])
+@pytest.mark.parametrize("w", [1440, 1024, 800])  # ≤ 768 px es móvil: barra inferior (QA TVN 1.5)
 def test_pestanas_de_la_cabecera_estan_centradas(page: Page, stack, w):
-    """En escritorio y tableta las pestañas quedan centradas en la cabecera (marca a la izquierda, asistente a la derecha)."""
+    """Masthead en 3 zonas (QA TVN 1.5): marca · navegación centrada en su zona · rol y asistente, sin solaparse."""
     page.set_viewport_size({"width": w, "height": 900})
     open_app(page, stack.url)
-    first, last = box(page, "nav-agenda"), box(page, "nav-fuentes")
-    brand = page.locator("header .comic-brand").bounding_box()
+    links = page.locator("[data-testid=main-nav] > a, [data-testid=main-nav] > .tvn-more")  # lo que no cabe va a «Más»
+    first, last = links.first.bounding_box(), links.last.bounding_box()
+    assert first and last
+    brand = box(page, "brand")
     asistente = box(page, "assistant-toggle")
+    nav = box(page, "main-nav")
     nav_center = (first["x"] + last["x"] + last["width"]) / 2
-    assert abs(nav_center - w / 2) <= 2, f"las pestañas no están centradas: centro {nav_center} vs {w / 2}"
+    assert abs(nav_center - (nav["x"] + nav["width"] / 2)) <= 60, f"las pestañas no están centradas en su zona: {nav_center} vs {nav}"
     assert brand and brand["x"] + brand["width"] < first["x"], "la marca debe quedar a la izquierda de las pestañas"
     assert asistente["x"] > last["x"] + last["width"], "el asistente debe quedar a la derecha de las pestañas"

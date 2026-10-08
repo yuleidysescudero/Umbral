@@ -81,6 +81,7 @@ def test_el_dom_real_no_contiene_controles_nativos(page: Page, stack, w, h):
 def test_menu_propio_con_teclado(page: Page, stack):
     page.set_viewport_size({"width": 1440, "height": 900})
     open_app(page, stack.url)
+    tid(page, "filters-toggle").click()  # QA TVN 1.5: filtros plegados por defecto
     trigger = tid(page, "filter-category")
     assert trigger.get_attribute("role") == "combobox"
     trigger.focus()
@@ -108,6 +109,7 @@ def test_menu_propio_con_teclado(page: Page, stack):
 def test_menu_propio_con_raton_y_clic_fuera(page: Page, stack):
     page.set_viewport_size({"width": 1440, "height": 900})
     open_app(page, stack.url)
+    tid(page, "filters-toggle").click()  # QA TVN 1.5: filtros plegados por defecto
     choose(page, "filter-evidence", "insuficiente")
     assert tid(page, "filter-evidence").get_attribute("data-value") == "insuficiente"
     expect(tid(page, "agenda-count")).to_contain_text("filtros", timeout=20_000)

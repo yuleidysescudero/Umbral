@@ -256,6 +256,7 @@ export function Agenda() {
             )}
           </div>
 
+        <Tooltip content="Temas que otros medios reportan (≥ 2 procedencias independientes) y TVN todavía no">
         <Button
           className="shrink-0"
           aria-pressed={tvnGap}
@@ -266,11 +267,11 @@ export function Agenda() {
             setLimit(5);
           }}
           data-testid="filter-tvn-gap"
-          title="Temas que otros medios reportan (≥ 2 procedencias independientes) y TVN todavía no"
         >
           <span className="hidden sm:inline">TVN aún no lo cubre</span>
           <span className="sm:hidden">Sin TVN</span>
         </Button>
+        </Tooltip>
         <Button
           className="shrink-0 justify-between"
           aria-expanded={filtersOpen}

@@ -131,7 +131,7 @@ function StatusBar() {
           )}
           <button
             type="button"
-            className="inline-flex min-h-9 items-center gap-1 rounded-full px-2 font-semibold text-info underline underline-offset-2"
+            className="inline-flex min-h-11 items-center gap-1 rounded-full px-2 font-semibold text-info underline underline-offset-2 lg:min-h-9"
             aria-expanded={statusOpen}
             aria-controls="status-details"
             onClick={() => setStatusOpen(!statusOpen)}
