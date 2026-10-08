@@ -474,6 +474,11 @@ class RetrievalInfo(ApiModel):
     coverage: float = 0.0
 
 
+class RelatedTopic(ApiModel):
+    id: str
+    title: str = Field(description="Titular visible del tema (para mostrar en lugar del ID)")
+
+
 class QueryResponse(ApiModel):
     query_id: str
     question: str
@@ -486,6 +491,7 @@ class QueryResponse(ApiModel):
     contradictions: list[Contradiction] = Field(default_factory=list)
     missing: list[str] = Field(default_factory=list)
     related_topic_ids: list[str] = Field(default_factory=list)
+    related_topics: list[RelatedTopic] = Field(default_factory=list, description="Mismo orden que relatedTopicIds, con su título")
     warnings: list[str] = Field(default_factory=list)
     snapshot_id: str
     rules_version: str

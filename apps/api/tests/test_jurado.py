@@ -241,3 +241,26 @@ def test_u_usa_deteccion_y_lo_dice(v2):
         u = next(c for c in t["scoreComponents"] if c["key"] == "U")
         assert u["value"] > 0, t["id"]
         assert "detección" in u["justification"], u["justification"]
+
+
+# ---------------------------------------------------------------- 5. asistente
+@pytest.mark.parametrize("q", ["Qué temas no ha cubierto TVN", "¿Qué temas no ha publicado TVN?", "temas sin cobertura de TVN"])
+def test_temas_no_cubiertos_por_tvn_filtra_tvn_gap(real, q):
+    r = ask(real, q)
+    assert r["intent"] == "agenda", r["intent"]
+    assert r["answerStatus"] == "respondida", r["answer"]
+    gaps = {t["id"] for t in real.get("/api/v1/topics", params={"limit": 100, "tvnGap": True}).json()["items"]}
+    assert r["relatedTopicIds"] and set(r["relatedTopicIds"]) <= gaps
+    for tid in r["relatedTopicIds"]:
+        base = real.svc.bases[tid]
+        assert not any(a.is_tvn for a in base.articles), tid
+    assert "TVN" in r["answer"] and "no" in r["answer"]
+
+
+def test_temas_relacionados_traen_titulo(real):
+    r = ask(real, "¿Qué pasó con la reforma eléctrica?")
+    assert r["relatedTopics"], r
+    assert [t["id"] for t in r["relatedTopics"]] == r["relatedTopicIds"]
+    for t in r["relatedTopics"]:
+        assert t["title"] and not t["title"].startswith("evt_")
+        assert t["title"] == real.svc.bases[t["id"]].display_title

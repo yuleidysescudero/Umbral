@@ -213,6 +213,7 @@ export class MockApi implements UmbralApi {
         contradictions: [],
         hits: [],
         relatedTopicIds: [],
+        relatedTopics: [],
         retrieval,
       };
     }
@@ -244,6 +245,7 @@ export class MockApi implements UmbralApi {
         suspiciousInstructions: h.a.suspiciousInstructions,
       })),
       relatedTopicIds: [...new Set(top.map((h) => h.t.summary.id))],
+      relatedTopics: [...new Map(top.map((h) => [h.t.summary.id, { id: h.t.summary.id, title: h.t.summary.title }])).values()],
       retrieval,
     };
   }

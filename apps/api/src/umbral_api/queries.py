@@ -19,6 +19,7 @@ from .models import (
     QueryIntent,
     QueryRequest,
     QueryResponse,
+    RelatedTopic,
     RetrievalInfo,
     TopicSummary,
 )
@@ -58,6 +59,12 @@ _RE_AGENDA = re.compile(r"\b(cinco|5|principales)\b.*\btemas?\b|\bque temas?\b|\
 _RE_VERIF = re.compile(r"falta(n)?\s+(por\s+)?verificar|verificaciones?|pendientes?\s+de\s+verif|que falta|vacios|por comprobar|falta comprobar")
 _RE_ECON = re.compile(r"contexto economico|indicadores?|banco mundial|\bpib\b|inflacion|desempleo|poblacion|\binternet\b|exportacion|crecimiento economico")
 _RE_NUMERIC = re.compile(r"\bcuant[oa]s?\b|\bcifra\b|\bmonto\b|\bporcentaje\b|\bnumero de\b|\btotal de\b|\bcuanto cuesta\b")
+# «Qué temas no ha cubierto TVN»: oportunidades (tvnGap), no la agenda general.
+_RE_TVN_GAP = re.compile(
+    r"\btvn\b.*\b(no|aun no|todavia no)\s+(lo\s+)?(ha\s+|han\s+)?(cubierto|publicado|reportado|cubre|publica|tiene)\b"
+    r"|\b(no|aun no|todavia no)\s+(lo\s+)?(ha\s+|han\s+)?(cubierto|publicado|reportado|cubre|publica)\b.*\btvn\b"
+    r"|\bsin (cobertura|notas?|nota) de tvn\b|\bsin tvn\b|\bhuecos? de tvn\b"
+)
 _RE_YEAR = re.compile(r"\b((?:19|20)\d{2})\b")
 _RE_TODAY = re.compile(r"\bhoy\b|\bactual(es|mente)?\b|\beste (ano|mes)\b|\bahora\b|\besta semana\b")
 # Palabras de la consulta que no nombran tema, país ni indicador («según», «fue»…): no son entidades desconocidas.
@@ -187,7 +194,7 @@ def _detect_intent(q: str) -> QueryIntent:
         return QueryIntent.verificaciones
     if _RE_SEISMIC.search(f) and not _RE_HUMAN_IMPACT.search(f):
         return QueryIntent.eventos_sismicos
-    if _RE_AGENDA.search(f):
+    if _RE_AGENDA.search(f) or _RE_TVN_GAP.search(f):
         return QueryIntent.agenda
     if _RE_ECON.search(f):
         return QueryIntent.contexto_economico
@@ -297,6 +304,10 @@ class QueryEngine:
 
     # ------------------------------------------------------------------ helpers
     def _base_resp(self, req: QueryRequest, intent: QueryIntent, t0: float, **kw) -> QueryResponse:  # noqa: ANN003
+        kw["related_topics"] = [
+            RelatedTopic(id=tid, title=self.bases[tid].display_title)
+            for tid in kw.get("related_topic_ids", []) if tid in self.bases
+        ]
         return QueryResponse(
             query_id="q_" + uuid.uuid4().hex[:12],
             question=req.question,
@@ -518,9 +529,16 @@ class QueryEngine:
         )
 
     def _agenda(self, req: QueryRequest, agenda: list[TopicSummary], t0: float) -> QueryResponse:
+        gap = bool(_RE_TVN_GAP.search(fold(req.question)))
+        if gap:
+            agenda = [t for t in agenda if t.tvn_gap]
         top = agenda[: max(1, min(req.limit, 5))] if agenda else []
         if not top:
-            return self._abstain(req, QueryIntent.agenda, t0, "no hay temas en el snapshot servido.")
+            return self._abstain(
+                req, QueryIntent.agenda, t0,
+                "ningún tema cumple la condición: al menos 2 procedencias independientes y ninguna nota de TVN."
+                if gap else "no hay temas en el snapshot servido.",
+            )
         lines = []
         cites: list[QueryCitation] = []
         for i, t in enumerate(top, 1):
@@ -534,8 +552,13 @@ class QueryEngine:
             if rep.suspicious_instructions:
                 continue
             cites.append(QueryCitation(evidence_id=rep.id, field="title", passage=rep.title, title=rep.title, url=rep.url))
+        header = (
+            f"**Temas que TVN no ha cubierto**: {len(agenda)} tema(s) que al menos 2 procedencias independientes reportan "
+            "y que no tienen ninguna nota de TVN en el snapshot; se muestran los de mayor puntaje"
+            if gap else "**Temas que merecen revisión**"
+        )
         ans = (
-            f"**Temas que merecen revisión** según `{base_rules_version()}` (snapshot {self.corpus.snapshot_id}).\n\n"
+            f"{header} según `{base_rules_version()}` (snapshot {self.corpus.snapshot_id}).\n\n"
             "Basado únicamente en titular/metadatos: el puntaje ordena, no demuestra verdad ni habilita publicación.\n\n"
             + "\n".join(lines)
         )

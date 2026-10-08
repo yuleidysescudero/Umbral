@@ -4247,6 +4247,14 @@
             "title": "Relatedtopicids",
             "type": "array"
           },
+          "relatedTopics": {
+            "description": "Mismo orden que relatedTopicIds, con su título",
+            "items": {
+              "$ref": "#/components/schemas/RelatedTopic"
+            },
+            "title": "Relatedtopics",
+            "type": "array"
+          },
           "retrieval": {
             "$ref": "#/components/schemas/RetrievalInfo"
           },
@@ -4278,6 +4286,7 @@
           "contradictions",
           "missing",
           "relatedTopicIds",
+          "relatedTopics",
           "warnings",
           "snapshotId",
           "rulesVersion",
@@ -4285,6 +4294,25 @@
           "retrieval"
         ],
         "title": "QueryResponse",
+        "type": "object"
+      },
+      "RelatedTopic": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "description": "Titular visible del tema (para mostrar en lugar del ID)",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "RelatedTopic",
         "type": "object"
       },
       "Reporter": {

@@ -1898,6 +1898,11 @@ export interface components {
             question: string;
             /** Relatedtopicids */
             relatedTopicIds: string[];
+            /**
+             * Relatedtopics
+             * @description Mismo orden que relatedTopicIds, con su título
+             */
+            relatedTopics: components["schemas"]["RelatedTopic"][];
             retrieval: components["schemas"]["RetrievalInfo"];
             /** Rulesversion */
             rulesVersion: string;
@@ -1905,6 +1910,16 @@ export interface components {
             snapshotId: string;
             /** Warnings */
             warnings: string[];
+        };
+        /** RelatedTopic */
+        RelatedTopic: {
+            /** Id */
+            id: string;
+            /**
+             * Title
+             * @description Titular visible del tema (para mostrar en lugar del ID)
+             */
+            title: string;
         };
         /** Reporter */
         Reporter: {

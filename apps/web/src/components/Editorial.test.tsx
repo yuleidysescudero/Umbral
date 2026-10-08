@@ -58,6 +58,21 @@ describe('estados editoriales y teclado', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('asistente muestra el título de los temas relacionados, no su ID', async () => {
+    mount(assistant);
+    const input = screen.getByLabelText('Tu pregunta');
+    fireEvent.change(input, { target: { value: 'Canal neopanamax' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    const related = await screen.findAllByTestId('assistant-related-topic');
+    expect(related.length).toBeGreaterThan(0);
+    for (const el of related) {
+      const id = el.getAttribute('data-topic-id') ?? '';
+      expect(id).not.toBe('');
+      expect(el.textContent).not.toContain(id);
+      expect(el.textContent?.trim().length).toBeGreaterThan(10);
+    }
+  });
+
   it('asistente muestra fuentes de una respuesta y explica los faltantes al abstenerse', async () => {
     mount(assistant);
     const input = screen.getByLabelText('Tu pregunta');
