@@ -48,6 +48,18 @@ def _tidy(text: str) -> str:
     return text
 
 
+def _contract(text: str) -> str:
+    """Contracciones obligatorias en el texto de la plantilla: «a el MEF» → «al MEF», «de el» → «del».
+
+    Solo con «el» en minúscula: «a El Salvador» o «de El Siglo» son nombres propios y no se contraen."""
+    text = re.sub(r"\b([aA]) el\b", lambda m: "al" if m.group(1) == "a" else "Al", text)
+    return re.sub(r"\b([dD]e) el\b", lambda m: "del" if m.group(1) == "de" else "Del", text)
+
+
+def _is_spanish(language: str | None) -> bool:
+    return (language or "es").lower().startswith("es")
+
+
 def spoken_part(script: str) -> str:
     """Lo que se lee al aire: el guion sin las notas de producción."""
     return script.split(SCRIPT_NOTES_LABEL)[0].replace("GUION:", "").strip()
@@ -350,9 +362,17 @@ def build_template_package(base: TopicBase, *, score: float, band: str, status: 
     when = fmt_date_pa(base.first_published, unknown="sin fecha de publicación confirmada")
     src = PRIMARY_SOURCE.get(base.category.value, PRIMARY_SOURCE["indeterminado"])
     # GUION: lo que lee el presentador. Solo hechos atribuidos (quién lo publicó y cuándo), nada sin fuente.
-    spoken = [
-        f"{outlet} informó en su titular que {title.strip().rstrip(' .')}{first_marker}.",
-    ]
+    foreign = not rep.suspicious_instructions and not _is_spanish(rep.language)
+    if foreign:
+        # No se lee al aire un titular en otro idioma ni se inventa una traducción: se atribuye y el original va a notas.
+        spoken = [
+            f"Un medio internacional, {outlet}, reporta que hay novedades sobre este tema{first_marker}; "
+            "el titular original está en otro idioma y su traducción debe verificarse antes de citarlo al aire.",
+        ]
+    else:
+        spoken = [
+            f"{outlet} informó en su titular que {title.strip().rstrip(' .')}{first_marker}.",
+        ]
     for c in decl[1:3]:
         spoken.append(f"La información también aparece en {c.text.split(' reporta')[0]} [{c.id}].")
     if facts:
@@ -360,11 +380,15 @@ def build_template_package(base: TopicBase, *, score: float, band: str, status: 
     spoken.append(f"La publicación original está fechada el {when}." if base.first_published else "La fecha original de la publicación todavía no está confirmada.")
     pads = [
         "Hasta este momento, lo que se conoce proviene de los titulares publicados y no del texto completo de las notas.",
-        f"El equipo de TVN consulta a {src[0]} para confirmar los detalles antes de ampliar la información.",
+        f"La confirmación de este dato corresponde a {src[0]}, la fuente primaria para este tipo de información.",
         "Es una información en desarrollo y cualquier cifra adicional se dará con su fuente y su fecha.",
-        "Si hay versiones distintas entre medios, se informarán ambas con su fuente, sin dar una por cierta.",
+        # Solo tiene sentido con más de una procedencia: con una sola fuente no hay «versiones entre medios».
+        *(["Si hay versiones distintas entre medios, se informarán ambas con su fuente, sin dar una por cierta."]
+          if base.independent >= 2 else []),
         "Ampliaremos esta información en cuanto exista confirmación de una fuente oficial.",
         "Les recordamos que en TVN cada dato se atribuye a la fuente que lo publicó.",
+        "Mientras tanto, conviene tomar estos datos con cautela y esperar la versión oficial.",
+        "Cuando exista un documento oficial, se citará con su fecha y con la institución que lo emite.",
     ]
     pi = 0
     while word_count(strip_markers(" ".join(spoken))) < SCRIPT_MIN_WORDS + 2 and pi < len(pads):
@@ -376,11 +400,13 @@ def build_template_package(base: TopicBase, *, score: float, band: str, status: 
     if word_count(strip_markers(guion)) > SCRIPT_MAX_WORDS - 2:  # titular muy largo
         guion = " ".join(strip_markers(guion).split()[: SCRIPT_MAX_WORDS - 6]) + "."
     notes = [f"Evidencia {status_txt}; basado únicamente en titular/metadatos."]
+    if foreign:
+        notes.append(f"Titular original ({rep.language}): {_q(title)}{first_marker}.")
     notes += [f"Verificar: {p.rstrip('.')}." for p in pending[:3]]
-    notes.append(f"Fuente primaria a consultar: {src[0]} ({src[1]}).")
+    notes.append(f"Pendiente: solicitar confirmación a {src[0]} ({src[1]}).")
     if base.contradictions:
         notes.append("Hay versiones incompatibles entre fuentes: no leer una cifra hasta resolverlas.")
-    script = _tidy(f"GUION: {guion}\n\n{SCRIPT_NOTES_LABEL}: " + " ".join(notes))
+    script = _tidy(f"GUION: {_contract(guion)}\n\n{SCRIPT_NOTES_LABEL}: " + _contract(" ".join(notes)))
 
     copy_core = f"{title.strip()}"
     cwords = copy_core.split()

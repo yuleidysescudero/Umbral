@@ -133,3 +133,70 @@ def test_cita_exige_las_palabras_de_contenido(real):
                 continue  # traducción traída por los vecinos semánticos de un resultado léxico fuerte
             title = art.title
             assert len(set(tokenize(title)) & content) >= need, (q, title, content)
+
+
+# ---------------------------------------------------------------- 3. guion del borrador
+def _templates(real):
+    from umbral_api.drafts import build_template_package
+
+    for b in real.svc.bases.values():
+        if not b.usable_articles:
+            continue
+        yield b, build_template_package(b, score=60.0, band="media", status=b.system_status.value)
+
+
+def test_guion_no_afirma_que_tvn_consulta(real):
+    from umbral_api.drafts import SCRIPT_NOTES_LABEL, spoken_part
+
+    for b, pkg in _templates(real):
+        assert "El equipo de TVN consulta" not in pkg.script, b.id
+        notes = pkg.script.split(SCRIPT_NOTES_LABEL)[1]
+        assert "Pendiente: solicitar confirmación a" in notes, b.id
+        assert "consulta a" not in spoken_part(pkg.script), b.id
+
+
+def test_guion_sin_a_el(real):
+    import re
+
+    for b, pkg in _templates(real):
+        assert not re.search(r"\b[aA] el\b", pkg.script), (b.id, pkg.script)
+        assert not re.search(r"\b[dD]e el\b", pkg.script), (b.id, pkg.script)
+
+
+def test_guion_no_lee_titulares_en_ingles(real):
+    from umbral_api.drafts import SCRIPT_NOTES_LABEL, spoken_part
+
+    b = real.svc.bases["evt_d1e3e4027d55dc34"]  # Canal: representante en inglés (newsroompanama.com)
+    assert b.representative.language == "en"
+    from umbral_api.drafts import build_template_package
+
+    pkg = build_template_package(b, score=76.7, band="alto", status=b.system_status.value)
+    spoken = spoken_part(pkg.script)
+    assert b.representative.title.rstrip(" .") not in spoken
+    assert "Increases Daily Transits" not in spoken
+    assert "un medio internacional" in spoken.lower()
+    assert "[c" in spoken  # la afirmación sigue citada
+    notes = pkg.script.split(SCRIPT_NOTES_LABEL)[1]
+    assert "Panama Canal Increases Daily Transits to 33" in notes  # el original queda en las notas
+
+
+def test_guion_sin_versiones_distintas_con_una_sola_fuente(real):
+    from umbral_api.drafts import spoken_part
+
+    singles = 0
+    for b, pkg in _templates(real):
+        if b.independent < 2:
+            singles += 1
+            assert "versiones distintas" not in spoken_part(pkg.script), b.id
+    assert singles > 10
+
+
+def test_guion_sigue_en_rango_y_valido(real):
+    from umbral_api.drafts import build_pack, validate_package
+
+    bad = []
+    for b, pkg in _templates(real):
+        _, report = validate_package(pkg, build_pack(b))
+        if any(i.code == "guion_fuera_de_rango" for i in report.issues):
+            bad.append(b.id)
+    assert not bad, bad[:5]
