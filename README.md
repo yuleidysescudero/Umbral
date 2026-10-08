@@ -1,6 +1,8 @@
+**Live demo (jury link):** https://umbral-mega.vercel.app/app/ · branch [`mega`](https://github.com/yuleidysescudero/Umbral/tree/mega)
+
 <div align="center">
 
-<img src="apps/web/public/brand/icon-256.png" width="80" alt="Umbral owl mark">
+<img src="apps/web/public/brand/icon-256.png" width="80" alt="Mini IA">
 
 # Umbral — From signal to decision
 
@@ -8,7 +10,7 @@
 
 **English** · [Español](README.es.md)
 
-[![CI](https://github.com/Tykillita/Umbral/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/Tykillita/Umbral/actions/workflows/ci.yml)
+[![CI](https://github.com/yuleidysescudero/Umbral/actions/workflows/ci.yml/badge.svg?branch=mega&style=flat-square)](https://github.com/yuleidysescudero/Umbral/actions/workflows/ci.yml?query=branch%3Amega)
 [![Astro](https://img.shields.io/badge/Astro-7-BC52EE?style=flat-square&logo=astro&logoColor=white)](https://astro.build)
 [![React](https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white)](https://react.dev)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -27,6 +29,9 @@
 <sub>Panama news and official indicators · Spanish interface · Free tiers only</sub>
 
 </div>
+
+> **TODO (TVN logo):** the app shows a text placeholder «TVN» in a white circle. Drop the official files `tvn-logo.png`, `tvn-logo-white.png` and `tvnmedia-logo-white.png` in `apps/web/public/brand/tvn/` and build with `PUBLIC_TVN_LOGO=1`. The logo is never drawn or recreated. *Prototype for TVN Media at hackIAthon; not an official product of Televisora Nacional, S.A.*
+
 
 Umbral was built for the TVN Media hackathon challenge *“From signal to decision”* (2026-10-07 to 2026-10-09). It answers one question: **which five topics deserve editorial review for Panama's agenda, and why?**
 
@@ -77,7 +82,7 @@ docs/          public documentation and contracts
 You need [`uv`](https://docs.astral.sh/uv/) (it fetches Python 3.12 without touching your system Python) and Node 24. The web app declares `node@24` as a dev dependency, so you do not need to change your global Node.
 
 ```bash
-git clone https://github.com/Tykillita/Umbral.git && cd Umbral
+git clone -b mega https://github.com/yuleidysescudero/Umbral.git && cd Umbral
 scripts/setup.sh          # Windows: scripts\setup.ps1  (add --laya / -Laya to install the model runtime)
 scripts/start-local.sh    # Windows: scripts\start-local.ps1
 ```

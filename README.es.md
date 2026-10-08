@@ -1,6 +1,8 @@
+**Demo en vivo (enlace para el jurado):** https://umbral-mega.vercel.app/app/ · rama [`mega`](https://github.com/yuleidysescudero/Umbral/tree/mega)
+
 <div align="center">
 
-<img src="apps/web/public/brand/icon-256.png" width="80" alt="Umbral owl mark">
+<img src="apps/web/public/brand/icon-256.png" width="80" alt="Mini IA">
 
 # Umbral — De la señal a la decisión
 
@@ -8,7 +10,7 @@
 
 [English](README.md) · **Español**
 
-[![CI](https://github.com/Tykillita/Umbral/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/Tykillita/Umbral/actions/workflows/ci.yml)
+[![CI](https://github.com/yuleidysescudero/Umbral/actions/workflows/ci.yml/badge.svg?branch=mega&style=flat-square)](https://github.com/yuleidysescudero/Umbral/actions/workflows/ci.yml?query=branch%3Amega)
 [![Astro](https://img.shields.io/badge/Astro-7-BC52EE?style=flat-square&logo=astro&logoColor=white)](https://astro.build)
 [![React](https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white)](https://react.dev)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -27,6 +29,9 @@
 <sub>Noticias de Panamá e indicadores oficiales · Interfaz en español · Solo planes gratuitos</sub>
 
 </div>
+
+> **TODO (logo de TVN):** la app muestra un marcador de texto «TVN» en un círculo blanco. Coloca los archivos oficiales `tvn-logo.png`, `tvn-logo-white.png` y `tvnmedia-logo-white.png` en `apps/web/public/brand/tvn/` y compila con `PUBLIC_TVN_LOGO=1`. El logo nunca se dibuja ni se recrea. *Prototipo de hackIAthon para TVN Media. No es un producto oficial de Televisora Nacional, S.A.*
+
 
 Umbral nace del reto de hackathon de TVN Media *«De la señal a la decisión»* (2026-10-07 a 2026-10-09). Responde a una pregunta: **¿qué cinco temas merecen revisión editorial para la agenda de Panamá y por qué?**
 
@@ -83,7 +88,7 @@ docs/          documentación pública y contratos
 Necesitas [`uv`](https://docs.astral.sh/uv/) (descarga Python 3.12 sin tocar el de tu sistema) y Node 24. La web declara `node@24` como dependencia de desarrollo, así que no hace falta cambiar tu Node global.
 
 ```bash
-git clone https://github.com/Tykillita/Umbral.git && cd Umbral
+git clone -b mega https://github.com/yuleidysescudero/Umbral.git && cd Umbral
 scripts/setup.sh          # Windows: scripts\setup.ps1  (añade --laya / -Laya para instalar el runtime del modelo)
 scripts/start-local.sh    # Windows: scripts\start-local.ps1
 ```
