@@ -1,97 +1,345 @@
 ---
 import Base from '../layouts/Base.astro';
 
+// Portada para entender y «vender» Umbral en un minuto: sin fórmulas ni jerga; cada promesa es verificable en la app.
 const steps = [
-  { n: '1', t: 'Cargar y validar', d: 'Noticias públicas (TVN RSS y GDELT) e indicadores del Banco Mundial en un snapshot con hash, versión y reporte de calidad.' },
-  { n: '2', t: 'Agrupar y clasificar', d: 'Duplicados agrupados por evento; una agencia replicada cuenta como una sola procedencia. Seis categorías temáticas.' },
-  { n: '3', t: 'Priorizar con reglas visibles', d: 'P = 30R + 25I + 20U + 15N + 10E. Cada componente muestra su regla y sus límites.' },
-  { n: '4', t: 'Explicar la evidencia', d: 'Qué se reporta, quién lo reporta, qué está respaldado, qué se contradice y qué falta comprobar.' },
-  { n: '5', t: 'Redactar y revisar', d: 'Brief, guion y copy con cita por afirmación. Una persona aprueba como borrador, pide evidencia o descarta.' },
+  { n: '01', t: 'Escucha', d: 'Reúne titulares públicos de TVN y otros medios, más datos oficiales del Banco Mundial y sismos del USGS, en un corte con fecha y huella verificable.' },
+  { n: '02', t: 'Agrupa', d: 'Junta las notas que cuentan el mismo hecho, aunque estén en otro idioma. Si cinco medios copian a una agencia, cuenta como una sola fuente.' },
+  { n: '03', t: 'Prioriza', d: 'Ordena los temas por cinco criterios a la vista: relevancia para Panamá, impacto, urgencia, novedad y evidencia disponible.' },
+  { n: '04', t: 'Explica', d: 'Cada tema trae su ficha: quién lo reporta, desde cuándo, qué se contradice y qué falta comprobar antes de salir al aire.' },
+  { n: '05', t: 'Propone', d: 'Prepara borradores de resumen, guion y copy para redes, con la fuente de cada afirmación. Una persona revisa y decide.' },
 ];
-const guarantees = [
-  ['No inventa', 'Sin cifras, citas ni fuentes que no estén en el corpus. Si no hay evidencia, el asistente se abstiene y dice qué falta.'],
-  ['No decide', 'El puntaje ordena la atención. No es una probabilidad de verdad ni habilita publicación; aprobar un borrador no es publicar.'],
-  ['No obedece a las fuentes', 'El texto de una noticia es dato, no instrucción. Las fuentes con instrucciones se marcan como no confiables.'],
-  ['Es trazable', 'Todo muestra snapshot, versión de reglas, fechas en hora de Panamá y si los datos son de fixture o provisionales.'],
+const promises = [
+  { si: 'Cita cada dato', no: 'No inventa cifras, declaraciones ni fuentes. Si no hay evidencia, lo dice y explica qué faltaría.' },
+  { si: 'Ordena la atención', no: 'No decide qué es verdad ni publica nada. Aprobar un borrador no es publicarlo.' },
+  { si: 'Lee las fuentes como datos', no: 'No obedece instrucciones escondidas en una noticia ni en una pregunta: las detecta y las rechaza.' },
+  { si: 'Muestra de dónde viene todo', no: 'No esconde fechas, versiones distintas ni límites: si dos medios no coinciden, enseña ambas.' },
+];
+const faqs = [
+  { q: '¿Qué hace Umbral en la mañana de una redacción?', a: 'Abre con los cinco temas que más merecen revisión ese día y, en una línea, por qué. Desde ahí se pasa a la ficha del tema o directo a los borradores.' },
+  { q: '¿Qué encuentro en la ficha de un tema?', a: 'Las notas agrupadas con medio y fecha, cuántas fuentes son realmente independientes, el contexto oficial con su año, las versiones que no coinciden y la lista de lo que falta verificar.' },
+  { q: '¿Puede escribir la nota por mí?', a: 'Prepara un borrador de resumen, un guion de 45 a 60 segundos y copy para redes, cada afirmación con su fuente. Es un punto de partida: una persona lo corrige, lo aprueba como borrador o lo descarta. Umbral no publica.' },
+  { q: '¿Y si le pregunto algo que no está en las fuentes?', a: 'El asistente, Mini IA, se abstiene y te dice qué información haría falta. Prefiere un «no lo sé» honesto antes que una cifra inventada.' },
+  { q: '¿Cómo decide qué tema va primero?', a: 'Con reglas fijas y visibles, no con una caja negra: cinco criterios con su peso, que la mesa editorial puede ajustar dejando el motivo. El orden indica dónde mirar primero; no es una medida de verdad.' },
+  { q: '¿Con qué datos trabaja hoy?', a: 'Con un corte del 7 de octubre de 2026: 991 titulares y metadatos públicos (TVN y otros medios vía GDELT), indicadores del Banco Mundial y sismos del USGS. No lee el texto completo de las notas, y lo advierte en cada pantalla.' },
+  { q: '¿Es un producto oficial de TVN?', a: 'No. Es un prototipo creado para el hackIAthon Panamá 2026, en el reto propuesto por TVN Media.' },
 ];
 ---
 
 <Base title="Umbral × TVN · Agenda editorial">
   <a href="#contenido" class="skip-link">Saltar al contenido</a>
   <header class="tvn-masthead">
-    <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
+    <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
       <a href="/" class="tvn-brand" aria-label="Umbral × TVN, inicio">
         <span class="tvn-logo" role="img" aria-label="TVN" style="width:38px;height:38px;font-size:13px">TVN</span>
         <span class="tvn-brand-divider" aria-hidden="true"></span>
         <span><span class="tvn-brand-name">Umbral</span><span class="tvn-brand-sub">Agenda editorial</span></span>
       </a>
-      <a href="/app/" class="comic-landing-link btn-tvn px-4 py-2 text-sm">Abrir la aplicación</a>
+      <a href="/app/" class="lp-cta lp-cta-sm">Abrir la aplicación</a>
     </div>
   </header>
 
-  <main id="contenido" class="comic-sheet mx-auto max-w-5xl px-4 pb-1">
-    <section class="comic-landing-hero">
-      <p class="kicker">Reto TVN Media · Copiloto de inteligencia informativa</p>
-      <h1 class="font-display mt-2 max-w-3xl text-4xl font-bold leading-[1.08] sm:text-6xl">
-        ¿Qué cinco temas merecen revisión para la agenda de Panamá, y por qué?
-      </h1>
-      <p class="mt-5 max-w-2xl text-lg text-ink-2">
-        Umbral convierte noticias públicas e indicadores oficiales en una agenda priorizada, fichas de evidencia con procedencia y borradores
-        para revisión humana. Ayuda a encontrar qué vale la pena mirar y deja claro qué falta comprobar; no se ha medido todavía cuánto tiempo ahorra.
-      </p>
-      <div class="mt-6 flex flex-wrap items-center gap-4">
-        <img src="/brand/tvn/mini-ia.png" alt="Mini IA, la mascota tecnológica de TVN" width="120" height="120" class="rounded-2xl border-2 border-white" />
-        <p class="max-w-md text-base">Mini IA te acompaña en el asistente: si no tiene evidencia, te lo dice.</p>
+  <main id="contenido">
+    <!-- Héroe: de la señal a la decisión, en una sola imagen -->
+    <section class="lp-hero" aria-labelledby="lp-title">
+      <div class="lp-hero-grid mx-auto max-w-6xl px-4">
+        <div>
+          <p class="lp-onair"><span class="lp-dot" aria-hidden="true"></span>Reto TVN Media · Copiloto de inteligencia informativa</p>
+          <h1 id="lp-title" class="lp-title">
+            Entran cientos de titulares.<br /><span class="lp-grad">Salen cinco temas</span>, con sus fuentes.
+          </h1>
+          <p class="lp-lead">
+            Umbral lee lo que publican los medios y los datos oficiales, agrupa lo repetido, prioriza lo que importa para Panamá
+            y le dice a la mesa editorial qué está respaldado y qué falta comprobar. La decisión siempre es de una persona.
+          </p>
+          <div class="mt-7 flex flex-wrap gap-3">
+            <a href="/app/" class="lp-cta">Ver la agenda de hoy</a>
+            <a href="#faq" class="lp-cta lp-cta-ghost">Preguntas frecuentes</a>
+          </div>
+        </div>
+
+        <!-- Embudo animado: datos reales del corte (no promesas de rendimiento) -->
+        <ol class="lp-funnel" aria-label="Del corte del 7 de octubre: 991 titulares, 170 temas en las seis categorías del reto, 5 para revisar hoy">
+          <li style="--w: 100%"><strong>991</strong><span>titulares y metadatos</span></li>
+          <li style="--w: 74%"><strong>170</strong><span>temas en las 6 categorías del reto</span></li>
+          <li style="--w: 46%"><strong>5</strong><span>para revisar hoy, con su porqué</span></li>
+        </ol>
       </div>
-      <div class="mt-7 flex flex-wrap gap-3">
-        <a href="/app/" class="comic-landing-link btn-tvn px-5 py-3">Ver la agenda</a>
-        <a href="/app/#/fuentes" class="comic-landing-link bg-card px-5 py-3 text-ink hover:bg-amber-50">Fuentes y evaluación</a>
+      <div class="lp-ticker" aria-hidden="true">
+        <div class="lp-ticker-track">
+          <span>Canal de Panamá</span><span>Turismo</span><span>Economía</span><span>Servicios públicos</span><span>Eventos naturales</span><span>Regulación</span>
+          <span>Canal de Panamá</span><span>Turismo</span><span>Economía</span><span>Servicios públicos</span><span>Eventos naturales</span><span>Regulación</span>
+        </div>
       </div>
     </section>
 
-    <section class="rule-top py-10" aria-labelledby="como">
-      <h2 id="como" class="font-display text-2xl font-bold">Cómo funciona</h2>
-      <ol class="mt-5 grid gap-4 md:grid-cols-5">
+    <!-- Cómo funciona: carrusel que se arrastra -->
+    <section class="mx-auto max-w-6xl px-4 py-14" aria-labelledby="como">
+      <div class="lp-section-head">
+        <div>
+          <p class="kicker">Cómo funciona</p>
+          <h2 id="como" class="lp-h2">De la señal a la decisión, en cinco pasos</h2>
+        </div>
+        <div class="lp-arrows">
+          <button type="button" class="lp-arrow" data-scroll="-1" aria-controls="lp-steps" aria-label="Paso anterior">←</button>
+          <button type="button" class="lp-arrow" data-scroll="1" aria-controls="lp-steps" aria-label="Paso siguiente">→</button>
+        </div>
+      </div>
+      <p class="lp-hint">Arrastra las tarjetas o usa las flechas.</p>
+      <ol id="lp-steps" class="lp-track" tabindex="0" aria-label="Pasos de Umbral">
         {
           steps.map((s) => (
-            <li class="comic-panel p-4">
-              <span class="font-score text-3xl text-amber-600">{s.n}</span>
-              <h3 class="mt-1 font-semibold">{s.t}</h3>
-              <p class="mt-1 text-sm text-ink-2">{s.d}</p>
+            <li class="lp-step">
+              <span class="lp-step-n">{s.n}</span>
+              <h3 class="lp-step-t">{s.t}</h3>
+              <p>{s.d}</p>
             </li>
           ))
         }
       </ol>
     </section>
 
-    <section class="border-t border-rule py-10" aria-labelledby="limites">
-      <h2 id="limites" class="font-display text-2xl font-bold">Lo que Umbral promete, y lo que no</h2>
-      <dl class="mt-5 grid gap-4 sm:grid-cols-2">
+    <!-- Promesas: tarjetas que se reordenan arrastrando y se voltean para ver «lo que no» -->
+    <section class="lp-band" aria-labelledby="limites">
+      <div class="mx-auto max-w-6xl px-4 py-14">
+        <p class="kicker">Lo que Umbral promete, y lo que no</p>
+        <h2 id="limites" class="lp-h2">Confianza que se puede comprobar</h2>
+        <p class="lp-hint">Toca una tarjeta para ver su límite. Arrástrala desde ⠿ (o usa Alt + flechas) para ordenarlas a tu gusto.</p>
+        <ul class="lp-deck" id="lp-deck">
+          {
+            promises.map((p, i) => (
+              <li class="lp-card" data-index={i}>
+                <span class="lp-handle" aria-hidden="true">⠿</span>
+                <button type="button" class="lp-card-inner" aria-pressed="false" aria-label={`${p.si}. Toca para ver lo que no hace.`}>
+                  <span class="lp-face lp-front">
+                    <span class="lp-tag lp-tag-si">Sí</span>
+                    <span class="lp-card-t">{p.si}</span>
+                    <span class="lp-flip-hint" aria-hidden="true">Ver lo que no ↻</span>
+                  </span>
+                  <span class="lp-face lp-back">
+                    <span class="lp-tag lp-tag-no">No</span>
+                    <span class="lp-card-d">{p.no}</span>
+                  </span>
+                </button>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </section>
+
+    <!-- Preguntas frecuentes (acordeón propio, sin controles nativos) -->
+    <section id="faq" class="mx-auto max-w-4xl px-4 py-14" aria-labelledby="faq-title">
+      <p class="kicker">Preguntas frecuentes</p>
+      <h2 id="faq-title" class="lp-h2">Lo que pregunta una mesa editorial</h2>
+      <div class="lp-faq">
         {
-          guarantees.map(([t, d]) => (
-            <div class="comic-panel p-4">
-              <dt class="font-display text-lg font-bold">{t}</dt>
-              <dd class="mt-1 text-ink-2">{d}</dd>
+          faqs.map((f, i) => (
+            <div class="lp-faq-item">
+              <h3>
+                <button type="button" class="lp-faq-q" aria-expanded="false" aria-controls={`faq-${i}`} id={`faq-q-${i}`}>
+                  <span>{f.q}</span>
+                  <span class="lp-faq-icon" aria-hidden="true">+</span>
+                </button>
+              </h3>
+              <div class="lp-faq-a" id={`faq-${i}`} role="region" aria-labelledby={`faq-q-${i}`} hidden>
+                <p>{f.a}</p>
+              </div>
             </div>
           ))
         }
-      </dl>
-    </section>
-
-    <section class="border-t border-rule py-10" aria-labelledby="vistas">
-      <h2 id="vistas" class="font-display text-2xl font-bold">Cuatro vistas y un asistente</h2>
-      <ul class="mt-4 grid gap-3 text-ink-2 sm:grid-cols-2">
-        <li><strong class="text-ink">Agenda.</strong> Cinco temas principales, filtros, búsqueda y puntaje desglosado con estado de evidencia.</li>
-        <li><strong class="text-ink">Ficha.</strong> Noticias agrupadas, contexto oficial con país, año y unidad, contradicciones y verificaciones pendientes.</li>
-        <li><strong class="text-ink">Borradores.</strong> Brief, guion y copy editables, con su origen (modelo, recuperado o plantilla) y revisión con responsable.</li>
-        <li><strong class="text-ink">Fuentes y evaluación.</strong> Catálogo, versión del snapshot, calidad y métricas reales (o «sin ejecutar»).</li>
-      </ul>
+      </div>
+      <div class="mt-10 flex flex-wrap items-center justify-between gap-4 lp-final">
+        <p class="lp-final-t">¿Listo para ver la agenda de hoy?</p>
+        <a href="/app/" class="lp-cta">Entrar a Umbral</a>
+      </div>
     </section>
   </main>
 
-  <footer class="border-t-2 border-ink">
-    <p class="mx-auto max-w-5xl px-4 py-5 text-sm text-ink-3">
-      <strong>Prototipo de hackIAthon para TVN Media. No es un producto oficial de Televisora Nacional, S.A.</strong> Prototipo del hackatón (7–9 de octubre de 2026). Licencia MIT. Los resultados son borradores y señales para revisión humana; no se publican noticias ni alertas de forma automática.
+  <footer class="tvn-masthead">
+    <p class="mx-auto max-w-6xl px-4 py-5 text-sm" style="color:#D9D6F2">
+      <strong style="color:#fff">Prototipo de hackIAthon para TVN Media. No es un producto oficial de Televisora Nacional, S.A.</strong>{' '}
+      Hackatón del 7 al 9 de octubre de 2026 · Licencia MIT. Los resultados son borradores y señales para revisión humana; no se publica nada de forma automática.
     </p>
   </footer>
 </Base>
+
+<style>
+  .lp-hero { position: relative; overflow: hidden; background: var(--color-frame); color: #fff; padding-top: 3.5rem; }
+  .lp-hero::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(#ffffff12 1px, transparent 1px); background-size: 14px 14px; pointer-events: none; }
+  .lp-hero-grid { position: relative; display: grid; gap: 2.5rem; align-items: center; padding-bottom: 3rem; }
+  @media (min-width: 900px) { .lp-hero-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
+  .lp-onair { display: inline-flex; align-items: center; gap: .55rem; padding: .35rem .85rem; border-radius: 999px; background: #ffffff14; border: 1px solid #ffffff33; font-family: var(--font-head); font-weight: 700; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: #E2E0F5; }
+  .lp-dot { width: .6rem; height: .6rem; border-radius: 999px; background: var(--color-tvn-red); box-shadow: 0 0 0 0 #E52D2799; animation: lp-pulse 1.8s infinite; }
+  @keyframes lp-pulse { 0% { box-shadow: 0 0 0 0 #E52D2799; } 70% { box-shadow: 0 0 0 .55rem #E52D2700; } 100% { box-shadow: 0 0 0 0 #E52D2700; } }
+  .lp-title { margin-top: 1.1rem; font-family: var(--font-head); font-weight: 900; font-size: clamp(2.3rem, 5.4vw, 4.1rem); line-height: 1.02; letter-spacing: -.02em; color: #fff; }
+  .lp-grad { background: var(--gradient-tvn); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lp-lead { margin-top: 1.2rem; max-width: 38rem; font-size: 1.12rem; color: #D9D6F2; }
+  .lp-cta { display: inline-flex; align-items: center; min-height: 2.9rem; padding: .55rem 1.4rem; border-radius: 999px; background: var(--gradient-tvn-strong); color: #fff; font-family: var(--font-head); font-weight: 800; border: 2px solid #ffffff55; box-shadow: 3px 3px 0 #02001a; text-decoration: none; transition: transform .15s; }
+  .lp-cta:hover { transform: translateY(-2px); }
+  .lp-cta-sm { min-height: 2.6rem; padding: .4rem 1.1rem; font-size: .9rem; }
+  .lp-cta-ghost { background: transparent; border-color: #ffffff88; box-shadow: none; }
+  .lp-funnel { list-style: none; margin: 0; padding: 0; display: grid; gap: .8rem; justify-items: center; }
+  .lp-funnel li { width: var(--w); display: flex; align-items: baseline; justify-content: center; gap: .7rem; padding: 1rem 1.2rem; border-radius: 18px; background: #ffffff10; border: 1.5px solid #ffffff30; text-align: left; opacity: 0; transform: translateY(14px); animation: lp-in .7s cubic-bezier(.22,1,.36,1) forwards; }
+  .lp-funnel li:nth-child(2) { animation-delay: .25s; background: #8B3FD933; }
+  .lp-funnel li:nth-child(3) { animation-delay: .5s; background: var(--gradient-tvn-strong); border-color: #ffffff77; box-shadow: 0 0 34px #28AAE155; }
+  .lp-funnel strong { font-family: var(--font-serif); font-weight: 800; font-size: 2.6rem; line-height: 1; color: #fff; }
+  .lp-funnel span { font-weight: 700; color: #E2E0F5; font-size: .95rem; }
+  @keyframes lp-in { to { opacity: 1; transform: none; } }
+  .lp-ticker { position: relative; border-top: 3px solid transparent; border-image: var(--gradient-tvn) 1; background: #070330; overflow: hidden; }
+  .lp-ticker-track { display: flex; gap: 2.5rem; width: max-content; padding: .7rem 0; animation: lp-marquee 28s linear infinite; font-family: var(--font-head); font-weight: 800; font-size: .85rem; letter-spacing: .1em; text-transform: uppercase; color: #C9C6EA; }
+  .lp-ticker-track span::before { content: '●'; color: var(--color-tvn-cyan); margin-right: .7rem; }
+  @keyframes lp-marquee { to { transform: translateX(-50%); } }
+
+  .lp-section-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .lp-h2 { font-family: var(--font-head); font-weight: 900; font-size: clamp(1.6rem, 3.4vw, 2.4rem); line-height: 1.08; margin-top: .3rem; color: var(--color-ink); }
+  .lp-hint { margin-top: .5rem; font-size: .88rem; color: var(--color-ink-3); }
+  .lp-arrows { display: flex; gap: .5rem; }
+  .lp-arrow { display: grid; place-items: center; width: 2.9rem; height: 2.9rem; border-radius: 999px; border: 2px solid var(--color-ink); background: var(--color-card); color: var(--color-ink); font-size: 1.2rem; font-weight: 800; box-shadow: 2px 2px 0 var(--color-shadow); cursor: pointer; }
+  .lp-track { list-style: none; margin: 1.4rem 0 0; padding: .3rem .3rem 1.2rem; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(16rem, 22rem); gap: 1.1rem; overflow-x: auto; scroll-snap-type: x mandatory; cursor: grab; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .lp-track::-webkit-scrollbar { display: none; }
+  .lp-track.is-dragging { cursor: grabbing; scroll-snap-type: none; user-select: none; }
+  .lp-step { scroll-snap-align: start; position: relative; min-height: 15rem; padding: 1.4rem; border: 2px solid var(--color-ink); border-radius: 18px; background: var(--color-card); box-shadow: 5px 5px 0 var(--color-shadow); transition: transform .2s; }
+  .lp-step:hover { transform: translateY(-4px) rotate(-.4deg); }
+  .lp-step-n { font-family: var(--font-serif); font-weight: 800; font-size: 3rem; line-height: 1; background: var(--gradient-tvn); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lp-step-t { margin-top: .4rem; font-family: var(--font-head); font-weight: 900; font-size: 1.35rem; color: var(--color-ink); }
+  .lp-step p { margin-top: .5rem; color: var(--color-ink-2); }
+
+  .lp-band { background: var(--color-sunk); border-block: 2px solid var(--color-ink); }
+  .lp-deck { list-style: none; margin: 1.6rem 0 0; padding: 0; display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+  .lp-card { position: relative; perspective: 900px; min-height: 12.5rem; transition: transform .2s; }
+  .lp-handle { position: absolute; top: .55rem; right: .7rem; z-index: 3; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 999px; font-size: 1.3rem; color: var(--color-ink-3); cursor: grab; touch-action: none; user-select: none; }
+  .lp-card:has(.lp-card-inner[aria-pressed="true"]) .lp-handle { color: #C9C6EA; }
+  @media (pointer: fine) { .lp-card { touch-action: none; } }
+  @media (max-width: 640px) { .lp-card, .lp-card-inner { min-height: 9.5rem; } }
+  .lp-card.is-lifted { transform: scale(1.04) rotate(-1.5deg); z-index: 5; }
+  .lp-card.is-lifted .lp-card-inner { box-shadow: 10px 12px 0 var(--color-shadow); }
+  .lp-card.is-placeholder { opacity: .35; }
+  .lp-card-inner { position: relative; display: block; width: 100%; height: 100%; min-height: 12.5rem; border: 0; padding: 0; background: none; cursor: grab; transform-style: preserve-3d; transition: transform .55s cubic-bezier(.22,1,.36,1); border-radius: 18px; text-align: left; }
+  .lp-card-inner[aria-pressed="true"] { transform: rotateY(180deg); }
+  .lp-face { position: absolute; inset: 0; display: flex; flex-direction: column; gap: .6rem; padding: 1.3rem; border: 2px solid var(--color-ink); border-radius: 18px; box-shadow: 5px 5px 0 var(--color-shadow); backface-visibility: hidden; }
+  .lp-front { background: var(--color-card); }
+  .lp-back { background: var(--color-frame); color: #fff; transform: rotateY(180deg); border-color: var(--color-tvn-night); }
+  .lp-tag { align-self: flex-start; padding: .15rem .7rem; border-radius: 999px; font-family: var(--font-head); font-weight: 900; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+  .lp-tag-si { background: var(--gradient-tvn-strong); color: #fff; }
+  .lp-tag-no { background: #fff; color: var(--color-tvn-night); }
+  .lp-card-t { font-family: var(--font-head); font-weight: 900; font-size: 1.45rem; line-height: 1.1; color: var(--color-ink); }
+  .lp-card-d { font-size: 1rem; line-height: 1.45; color: #ECEAFB; }
+  .lp-flip-hint { margin-top: auto; font-size: .8rem; font-weight: 700; color: var(--color-ink-3); }
+
+  .lp-faq { margin-top: 1.4rem; display: grid; gap: .7rem; }
+  .lp-faq-item { border: 2px solid var(--color-ink); border-radius: 16px; background: var(--color-card); box-shadow: 4px 4px 0 var(--color-shadow); overflow: hidden; }
+  .lp-faq-item h3 { margin: 0; }
+  .lp-faq-q { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1rem; min-height: 3.4rem; padding: .8rem 1.1rem; border: 0; background: none; text-align: left; font-family: var(--font-head); font-weight: 800; font-size: 1.05rem; color: var(--color-ink); cursor: pointer; }
+  .lp-faq-icon { display: grid; place-items: center; flex-shrink: 0; width: 2rem; height: 2rem; border-radius: 999px; background: var(--gradient-tvn-strong); color: #fff; font-size: 1.2rem; transition: transform .25s; }
+  .lp-faq-q[aria-expanded="true"] .lp-faq-icon { transform: rotate(45deg); }
+  .lp-faq-a { padding: 0 1.1rem 1rem; color: var(--color-ink-2); }
+  .lp-final { padding: 1.4rem 1.6rem; border-radius: 20px; background: var(--color-frame); }
+  .lp-final-t { font-family: var(--font-head); font-weight: 900; font-size: 1.4rem; color: #fff; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lp-dot, .lp-ticker-track, .lp-funnel li { animation: none !important; opacity: 1; transform: none; }
+    .lp-card-inner, .lp-step, .lp-card { transition: none !important; }
+  }
+</style>
+
+<script>
+  // ---- Carrusel «Cómo funciona»: arrastre con puntero, flechas y teclado ----
+  const track = document.getElementById('lp-steps') as HTMLElement | null;
+  if (track) {
+    let down = false, startX = 0, startLeft = 0, moved = false;
+    track.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse') return; // en táctil, el desplazamiento nativo ya arrastra
+      down = true; moved = false; startX = e.clientX; startLeft = track.scrollLeft;
+      track.setPointerCapture(e.pointerId); track.classList.add('is-dragging');
+    });
+    track.addEventListener('pointermove', (e) => {
+      if (!down) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 3) moved = true;
+      track.scrollLeft = startLeft - dx;
+    });
+    const end = () => { down = false; track.classList.remove('is-dragging'); };
+    track.addEventListener('pointerup', end);
+    track.addEventListener('pointercancel', end);
+    track.addEventListener('click', (e) => { if (moved) e.preventDefault(); }, true);
+    const step = () => (track.querySelector('.lp-step') as HTMLElement | null)?.offsetWidth ?? 300;
+    document.querySelectorAll<HTMLButtonElement>('[data-scroll]').forEach((b) =>
+      b.addEventListener('click', () => track.scrollBy({ left: Number(b.dataset.scroll) * (step() + 18), behavior: 'smooth' })),
+    );
+    track.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        track.scrollBy({ left: (e.key === 'ArrowRight' ? 1 : -1) * (step() + 18), behavior: 'smooth' });
+      }
+    });
+  }
+
+  // ---- Promesas: voltear con un toque; reordenar arrastrando (o con Alt + flechas) ----
+  const deck = document.getElementById('lp-deck');
+  if (deck) {
+    let drag: { card: HTMLElement; id: number; x: number; y: number; moved: boolean; touch: boolean } | null = null;
+    deck.addEventListener('pointerdown', (e) => {
+      const card = (e.target as HTMLElement).closest('.lp-card') as HTMLElement | null;
+      if (!card) return;
+      // Con el dedo solo se arrastra desde el asa: así la página se puede desplazar tocando las tarjetas.
+      const fromHandle = Boolean((e.target as HTMLElement).closest('.lp-handle'));
+      drag = { card, id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, touch: e.pointerType !== 'mouse' && !fromHandle };
+    });
+    deck.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id || drag.touch) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 8) return;
+      if (!drag.moved) { drag.moved = true; drag.card.classList.add('is-lifted'); drag.card.setPointerCapture(e.pointerId); }
+      drag.card.style.translate = `${dx}px ${dy}px`;
+      const over = document.elementsFromPoint(e.clientX, e.clientY).map((el) => el.closest('.lp-card')).find((c) => c && c !== drag!.card) as HTMLElement | undefined;
+      if (over) {
+        const r = over.getBoundingClientRect(); const before = e.clientX < r.left + r.width / 2;
+        const prev = drag.card.getBoundingClientRect();
+        deck.insertBefore(drag.card, before ? over : over.nextSibling);
+        const next = drag.card.getBoundingClientRect();
+        drag.x += next.left - prev.left; drag.y += next.top - prev.top;
+        drag.card.style.translate = `${e.clientX - drag.x}px ${e.clientY - drag.y}px`;
+      }
+    });
+    const drop = () => { if (!drag) return; drag.card.classList.remove('is-lifted'); drag.card.style.translate = ''; drag = null; };
+    deck.addEventListener('pointerup', (e) => {
+      if (drag && !drag.moved && !(e.target as HTMLElement).closest('.lp-handle')) {
+        const btn = drag.card.querySelector('.lp-card-inner') as HTMLButtonElement;
+        btn.setAttribute('aria-pressed', btn.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      }
+      drop();
+      e.preventDefault();
+    });
+    deck.addEventListener('pointercancel', drop);
+    deck.addEventListener('click', (e) => e.preventDefault());
+    deck.addEventListener('keydown', (e) => {
+      const btn = (e.target as HTMLElement).closest('.lp-card-inner') as HTMLButtonElement | null;
+      if (!btn) return;
+      const card = btn.closest('.lp-card') as HTMLElement;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        btn.setAttribute('aria-pressed', btn.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      } else if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) {
+        e.preventDefault(); if (card.previousElementSibling) deck.insertBefore(card, card.previousElementSibling); btn.focus();
+      } else if (e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) {
+        e.preventDefault(); if (card.nextElementSibling) deck.insertBefore(card.nextElementSibling, card); btn.focus();
+      }
+    });
+  }
+
+  // ---- Preguntas frecuentes: acordeón propio (una abierta a la vez) ----
+  document.querySelectorAll<HTMLButtonElement>('.lp-faq-q').forEach((q) => {
+    q.addEventListener('click', () => {
+      const open = q.getAttribute('aria-expanded') === 'true';
+      document.querySelectorAll<HTMLButtonElement>('.lp-faq-q').forEach((o) => {
+        o.setAttribute('aria-expanded', 'false');
+        document.getElementById(o.getAttribute('aria-controls')!)!.hidden = true;
+      });
+      if (!open) {
+        q.setAttribute('aria-expanded', 'true');
+        document.getElementById(q.getAttribute('aria-controls')!)!.hidden = false;
+      }
+    });
+  });
+</script>
