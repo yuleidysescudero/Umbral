@@ -29,6 +29,9 @@ export const SUPABASE = {
 };
 export const compartidoDisponible = Boolean(SUPABASE.url && SUPABASE.anon && SUPABASE.demo);
 
+/** Builds con sesión por rol (MEGA en Vercel): entrada sin contraseña, mesa compartida y vista simplificada. */
+export const SESSION_GATE = String(env.PUBLIC_SESSION_GATE ?? '').trim() === '1';
+
 const KEY = 'umbral.session';
 
 export function leerSesion(): Session | null {

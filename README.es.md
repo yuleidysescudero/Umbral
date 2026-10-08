@@ -34,6 +34,12 @@ Umbral nace del reto de hackathon de TVN Media *«De la señal a la decisión»*
 
 La interfaz está en español. El código y los identificadores están en inglés; el README en inglés refleja este.
 
+## Versión MEGA (para el jurado)
+
+**Demo:** https://umbral-mega.vercel.app/app/ — entrada por rol sin contraseña, mesa compartida del equipo, agrupación
+semántica de eventos, etiquetado humano a ciegas y correcciones a las consultas con trampa del jurado. Web y API en el
+mismo Vercel (sin arranque en frío). Detalle, pruebas y límites en [docs/public/MEGA.md](docs/public/MEGA.md).
+
 ## Funciones
 
 - **Agenda priorizada.** Un puntaje transparente y versionado (`scoring-v1`): `P = 30R + 25I + 20U + 15N + 10E` (relevancia, impacto, urgencia, novedad, evidencia). Bajo `[0, 40)`, medio `[40, 70)`, alto `[70, 100]`. El *estado de evidencia* (insuficiente / parcial / suficiente para el borrador) es independiente del puntaje, y una nota replicada por una agencia cuenta como **una** procedencia.

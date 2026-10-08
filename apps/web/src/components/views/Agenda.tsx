@@ -8,7 +8,8 @@ import { useDisclosureMotion, useEntrance, useRevealNew } from '../../lib/useMot
 import { useApp } from '../context';
 import { BandPill, Button, ErrorBox, EvidencePill, Loading, Notice, Pill, ReviewPill, inputCls } from '../ui';
 import { ScoreBreakdown } from '../ScoreBreakdown';
-import { Select, Tooltip, type SelectOption } from '../ui/controls';
+import { Disclosure, Select, Tooltip, type SelectOption } from '../ui/controls';
+import { SESSION_GATE } from '../../lib/session';
 
 function FilterSelect<T extends string>({
   id,
@@ -75,6 +76,13 @@ export function TopicFlags({ t }: { t: TopicSummary }) {
   );
 }
 
+/** Lenguaje de redacción: repetición no es corroboración (CU-03). */
+function fuentesReales(t: TopicSummary): string {
+  const n = t.independentProvenances, m = t.articleCount;
+  const fuentes = `${n} fuente${n === 1 ? '' : 's'} real${n === 1 ? '' : 'es'}`;
+  return m > n ? `Ojo: ${m} notas, pero solo ${fuentes}: las réplicas no son corroboración.` : `${fuentes} independiente${n === 1 ? '' : 's'}.`;
+}
+
 function TopicCard({ t, onOpen }: { t: TopicSummary; onOpen: (id: string) => void }) {
   const { go } = useApp();
   return (
@@ -113,7 +121,16 @@ function TopicCard({ t, onOpen }: { t: TopicSummary; onOpen: (id: string) => voi
             <span className="font-semibold text-ink">Por qué: </span>
             {t.topReason}
           </p>
-          <p className="text-xs text-ink-3">Pertinencia geográfica: {t.relevanceReason}</p>
+          {SESSION_GATE ? (
+            <>
+              <p className="text-sm font-semibold" data-testid="topic-real-sources">{fuentesReales(t)}</p>
+              <Disclosure summary="Cómo se calculó la relevancia" className="text-xs text-ink-3" testId="topic-relevance-detail">
+                <p className="pt-1">Pertinencia geográfica: {t.relevanceReason}</p>
+              </Disclosure>
+            </>
+          ) : (
+            <p className="text-xs text-ink-3">Pertinencia geográfica: {t.relevanceReason}</p>
+          )}
           <div className="flex flex-wrap gap-1.5">
             <EvidencePill status={t.evidenceStatus} />
             <ReviewPill status={t.reviewStatus} testId="topic-review-status" />

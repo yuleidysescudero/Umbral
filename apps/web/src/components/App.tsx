@@ -19,7 +19,7 @@ import { Sources } from './views/Sources';
 import { Mesa } from './views/Mesa';
 import { Etiquetar } from './views/Etiquetar';
 import { SessionGate } from './SessionGate';
-import { guardarSesion, leerSesion, ROLES, type Session } from '../lib/session';
+import { guardarSesion, leerSesion, ROLES, SESSION_GATE, type Session } from '../lib/session';
 import { Assistant } from './Assistant';
 import { Button, ErrorBox, Loading, Notice, Pill } from './ui';
 
@@ -29,8 +29,6 @@ const NAV: { view: Route['view']; label: string; icon: typeof ListOrdered; testI
   { view: 'borradores', label: 'Borradores', icon: PenLine, testId: 'nav-borradores' },
   { view: 'fuentes', label: 'Fuentes y evaluación', icon: Database, testId: 'nav-fuentes' },
 ];
-// Builds con sesión por rol (MEGA en Vercel): entrada sin contraseña y mesa compartida del equipo.
-export const SESSION_GATE = String(import.meta.env.PUBLIC_SESSION_GATE ?? '').trim() === '1';
 const NAV_EXTRA = [
   { view: 'mesa' as const, label: 'Mesa', icon: Users, testId: 'nav-mesa' },
   { view: 'etiquetar' as const, label: 'Etiquetar', icon: Tags, testId: 'nav-etiquetar' },

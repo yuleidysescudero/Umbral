@@ -182,6 +182,7 @@ h1, h2, h3, .comic-page-heading, .topic-copy h3 {
     background: var(--color-card); border-top: 2px solid var(--color-ink);
     padding-bottom: env(safe-area-inset-bottom);
   }
+  .comic-tabbar:has(> :nth-child(6)) { grid-template-columns: repeat(3, minmax(0, 1fr)); } /* MEGA: 6 vistas, 2 filas de 3 */
   .comic-tabbar .comic-nav {
     flex-direction: column; justify-content: center; gap: .2rem; min-height: 3.5rem;
     padding: .35rem .15rem; font-size: .72rem; line-height: 1.1; text-align: center; border-radius: 0;
