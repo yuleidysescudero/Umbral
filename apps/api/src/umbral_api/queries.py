@@ -64,7 +64,18 @@ _RE_TODAY = re.compile(r"\bhoy\b|\bactual(es|mente)?\b|\beste (ano|mes)\b|\bahor
 _QUERY_WORDS = {
     "segun", "fue", "era", "es", "son", "registro", "registra", "reporta", "reporto", "dice", "dijo", "indica",
     "tuvo", "tiene", "hubo", "hay", "cuanto", "cuanta", "cuantos", "cuantas", "sabe", "saber", "informa",
+    # Peticiones y verbos de procedencia («muéstrame de dónde proviene…»): forma de la pregunta, no un país.
+    "muestrame", "mostrar", "ensename", "ensenar", "explica", "explicame", "indicame", "quiero", "ver", "donde",
+    "proviene", "provienen", "viene", "vienen", "sale", "salen", "sacan", "origen", "procede", "proceden",
+    "procedencia", "obtiene", "obtuvo",
 }
+_NUMBER_WORDS = {"dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6, "siete": 7, "ocho": 8, "nueve": 9, "diez": 10}
+# «Si cinco medios replican la misma agencia, ¿cuántas fuentes independientes cuentas?»: pregunta por la regla.
+_REPLICA = r"(replic|repit|reproduc|copi|retom|republic)\w*"
+_RE_PROVENANCE_RULE = re.compile(
+    rf"\bagencias?\b.*\b{_REPLICA}|\b{_REPLICA}.*\bagencias?\b"
+    r"|\bcuant[oa]s\s+(fuentes|procedencias)\s+independientes\b|\bregla de procedencia\b"
+)
 
 _MONEY = r"(\$|us\$|b/\.|usd)\s*\d|\d[\d.,]*\s*(millones|mil millones|dolares|balboas)"
 # Tipo de cifra pedida → (etiqueta, patrón en la pregunta, patrón que debe tener UN titular pertinente, qué falta).
@@ -167,6 +178,8 @@ def _category(f: str) -> str | None:
 
 def _detect_intent(q: str) -> QueryIntent:
     f = fold(q)
+    if _RE_PROVENANCE_RULE.search(f):
+        return QueryIntent.regla_procedencia
     summary = (_RE_SUMMARY.search(f) and (_category(f) or _period(f))) or (_RE_SUMMARY_WITH_PERIOD.search(f) and _period(f))
     if summary and not _RE_ASKS_QUANTITY.search(f):
         return QueryIntent.resumen_periodo
@@ -265,7 +278,9 @@ class QueryEngine:
 
         if intent == QueryIntent.eventos_sismicos and not self.corpus.events:
             intent = QueryIntent.busqueda  # paquete sin events.geojson (fixture): se buscan titulares
-        if intent == QueryIntent.resumen_periodo:
+        if intent == QueryIntent.regla_procedencia:
+            resp = self._regla_procedencia(req, scope, t0)
+        elif intent == QueryIntent.resumen_periodo:
             resp = self._resumen(req, agenda, t0)
         elif intent == QueryIntent.eventos_sismicos:
             resp = self._sismos(req, t0)
@@ -427,6 +442,75 @@ class QueryEngine:
         return {t for t in q if t not in skip and not t.isdigit()}
 
     # ------------------------------------------------------------------ intents
+    def _provenance_example(self, scope: TopicBase | None) -> tuple[TopicBase, str, list] | None:
+        """Tema real donde una agencia replicada cuenta una vez: (tema, clave de la agencia, sus notas).
+
+        Solo temas cuyo conteo coincide con las claves de origen (sin topes del paquete), para que el ejemplo se pueda
+        comprobar nota por nota. Se prefiere el Canal; después, el tema con más notas."""
+        candidates = [scope] if scope is not None else list(self.bases.values())
+        found: list[tuple[TopicBase, str, list]] = []
+        for b in candidates:
+            usable = [a for a in b.usable_articles if not a.sponsored_content]
+            keys = [a.origin_key for a in usable]
+            if b.suspicious_ids or b.independent != len(set(keys)):
+                continue
+            agencies = [k for k in dict.fromkeys(keys) if k.startswith("agency:") and keys.count(k) >= 2]
+            if agencies:
+                found.append((b, agencies[0], [a for a in usable if a.origin_key == agencies[0]]))
+        if not found:
+            return None
+        return min(found, key=lambda x: (x[0].category.value != "logistica_canal", -len(x[0].usable_articles), x[0].id))
+
+    def _regla_procedencia(self, req: QueryRequest, scope: TopicBase | None, t0: float) -> QueryResponse:
+        """La regla de conteo explicada con un tema real del snapshot y sus notas citadas."""
+        f = fold(req.question)
+        m = re.search(r"\b(\d{1,2}|" + "|".join(_NUMBER_WORDS) + r")\s+(medios|notas|sitios|portales|diarios|periodicos)\b", f)
+        n_asked = (int(m.group(1)) if m.group(1).isdigit() else _NUMBER_WORDS[m.group(1)]) if m else None
+        direct = (
+            f"**{n_asked} medios que replican la misma agencia cuentan como una sola procedencia independiente, no {n_asked}.**"
+            if n_asked and n_asked > 1 else
+            "**Varios medios que replican la misma agencia cuentan como una sola procedencia independiente.**"
+        )
+        rule = (
+            "Repetir no es corroborar. Umbral agrupa las notas de un tema por su origen: la agencia cuando la nota la "
+            "declara (firma o titular, p. ej. «- Xinhua»); si no, el medio que la publica. Los orígenes desconocidos se "
+            "cuentan por dominio y el contenido patrocinado no suma. Para que la evidencia pase de «insuficiente» hacen "
+            "falta al menos 2 procedencias independientes."
+        )
+        example = self._provenance_example(scope)
+        if example is None:
+            return self._base_resp(
+                req, QueryIntent.regla_procedencia, t0, answer_status=AnswerStatus.parcial,
+                answer=f"{direct}\n\n{rule}\n\nEn el snapshot {self.corpus.snapshot_id} no hay un tema con una agencia "
+                       "replicada para mostrarlo con un ejemplo.",
+                missing=["Un tema del snapshot con la misma agencia replicada en varias notas."], coverage=1.0,
+            )
+        base, agency_key, replicas = example
+        agency = replicas[0].origin.strip() or agency_key.split(":", 1)[1]
+        agency = agency[:1].upper() + agency[1:]
+        notes = base.usable_articles
+        lines: list[str] = []
+        cites: list[QueryCitation] = []
+        for a in sorted(notes, key=lambda a: (a.origin_key != agency_key, a.outlet, a.id)):
+            origin = f"agencia {agency}" if a.origin_key == agency_key else f"medio {a.outlet}"
+            lines.append(f"- {a.outlet}: «{a.title}» [{a.id}] → procedencia: {origin}")
+            cites.append(QueryCitation(evidence_id=a.id, field="title", passage=a.title, title=a.title, url=a.url))
+        others = base.independent - 1
+        ans = (
+            f"{direct}\n\n{rule}\n\n"
+            f"**Ejemplo real del snapshot {self.corpus.snapshot_id}:** el tema «{base.display_title}» tiene "
+            f"**{len(notes)} notas y {base.independent} procedencias independientes**: las {len(replicas)} notas de "
+            f"{agency} cuentan como una sola procedencia y las demás notas suman {others} procedencia(s) más, una por origen distinto.\n\n"
+            + "\n".join(lines)
+            + "\n\nEl conteo ordena la confianza en la evidencia; no demuestra que el hecho sea cierto "
+              "(basado únicamente en titular/metadatos)."
+        )
+        return self._base_resp(
+            req, QueryIntent.regla_procedencia, t0, answer_status=AnswerStatus.respondida, answer=ans, citations=cites,
+            hits=[self._hit_model(Hit(self._doc_by_id[c.evidence_id], 0.0, 0.0, 1.0, [], 1.0)) for c in cites[:req.limit]],
+            related_topic_ids=[base.id], coverage=1.0, method="regla-procedencia",
+        )
+
     def _agenda(self, req: QueryRequest, agenda: list[TopicSummary], t0: float) -> QueryResponse:
         top = agenda[: max(1, min(req.limit, 5))] if agenda else []
         if not top:
@@ -649,7 +733,7 @@ class QueryEngine:
                         else:
                             found += 1
                             selected_ids.add(row.id)
-                            lines.append(f"- {label}, {y}: {format_value_es(row.value, row.unit)} (dato anual de referencia, no una medición de hoy).")
+                            lines.append(_econ_line(f"{label}, {y}", row))
                             cites.extend(_ind_cites(row))
                 else:
                     valid = [p for p in rows if not p.is_missing and p.year <= self.corpus.cutoff.year]
@@ -659,7 +743,7 @@ class QueryEngine:
                     row = valid[-1]
                     found += 1
                     selected_ids.add(row.id)
-                    lines.append(f"- {label}, último año con dato {row.year}: {format_value_es(row.value, row.unit)} (dato anual de referencia, no una medición de hoy).")
+                    lines.append(_econ_line(f"{label}, último año con dato {row.year}", row))
                     cites.extend(_ind_cites(row))
                     later = [p for p in rows if p.is_missing and p.year > row.year]
                     if later:
@@ -840,6 +924,12 @@ class QueryEngine:
             warnings=warnings, coverage=coverage, matched_terms=best.matched,
             method="bm25+rapidfuzz+semantico-rrf" if semantic else "bm25+rapidfuzz",
         )
+
+
+def _econ_line(label: str, p: IndicatorPoint) -> str:
+    """Valor, año, unidad, fuente y URL: la respuesta dice de dónde sale la cifra, no solo la cita."""
+    url = f" · {p.source_url}" if p.source_url else ""
+    return f"- {label}: {format_value_es(p.value, p.unit)} (dato anual, no de hoy). Fuente: Banco Mundial, {p.indicator_id}{url}"
 
 
 def _ind_text(p: IndicatorPoint) -> str:

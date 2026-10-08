@@ -63,7 +63,7 @@ def test_t04_annual_indicator_keeps_country_year_unit_and_is_not_today(make_app)
     r = ask(make_app(), "¿Cuál es el crecimiento del PIB de Panamá hoy?")
     assert r["answerStatus"] in {"respondida", "parcial"}
     a = r["answer"]
-    assert "2023" in a and "% anual" in a and "no una medición de hoy" in a
+    assert "2023" in a and "% anual" in a and "dato anual, no de hoy" in a
     assert any(c["evidenceId"].startswith("fx_ind_PAN_NY.GDP") for c in r["citations"])
 
 

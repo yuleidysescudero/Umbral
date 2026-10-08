@@ -47,7 +47,7 @@ def test_world_bank_question_with_common_words_is_answered_with_year(make_app, q
     r = ask(make_app(), q)
     assert r["answerStatus"] in {"respondida", "parcial"}, r["answer"]
     assert r["intent"] == "contexto_economico"
-    assert "no una medición de hoy" in r["answer"]
+    assert "dato anual, no de hoy" in r["answer"]
     fields = {c["field"] for c in r["citations"]}
     assert {"value", "year"} <= fields  # cifra y año citados (T04)
 

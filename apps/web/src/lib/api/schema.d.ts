@@ -1859,7 +1859,7 @@ export interface components {
          * QueryIntent
          * @enum {string}
          */
-        QueryIntent: "agenda" | "contexto_economico" | "verificaciones" | "busqueda" | "eventos_sismicos" | "resumen_periodo";
+        QueryIntent: "agenda" | "contexto_economico" | "verificaciones" | "busqueda" | "eventos_sismicos" | "resumen_periodo" | "regla_procedencia";
         /** QueryRequest */
         QueryRequest: {
             /**

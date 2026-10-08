@@ -165,6 +165,7 @@ class QueryIntent(StrEnum):
     busqueda = "busqueda"
     eventos_sismicos = "eventos_sismicos"
     resumen_periodo = "resumen_periodo"
+    regla_procedencia = "regla_procedencia"
 
 
 # --------------------------------------------------------------------------- evidencia

@@ -4138,7 +4138,8 @@
           "verificaciones",
           "busqueda",
           "eventos_sismicos",
-          "resumen_periodo"
+          "resumen_periodo",
+          "regla_procedencia"
         ],
         "title": "QueryIntent",
         "type": "string"
