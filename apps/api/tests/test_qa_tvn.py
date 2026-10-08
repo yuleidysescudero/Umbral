@@ -132,3 +132,76 @@ def test_delimiter_injection_answers_legit_part(real):
     r = ask(real, INJECTIONS[0])
     assert r["answer"].startswith("Rechacé un fragmento")
     assert "reforma eléctrica" in r["answer"]
+
+
+# ---------------------------------------------------------------- 3.6 peticiones naturales de redacción
+@needs_real
+@pytest.mark.parametrize("q", [
+    "dame el resumen de economía de esta semana",
+    "resúmeme lo del canal esta semana",
+    "panorama de turismo de este mes",
+])
+def test_newsroom_summary_requests_are_answered(real, q):
+    r = ask(real, q)
+    assert r["intent"] == "resumen_periodo", r["intent"]
+    assert r["answerStatus"] in {"respondida", "parcial"}, r.get("abstentionReason")
+    assert r["citations"] and "corte" in r["answer"]
+
+
+@needs_real
+def test_summary_never_shows_words_the_user_did_not_write(real):
+    for q in ("dame el resumen de economía de esta semana", "resumen de las elecciones en Marte"):
+        r = ask(real, q)
+        blob = r["answer"] + " " + (r.get("abstentionReason") or "") + " ".join(r["missing"])
+        assert "presumen" not in blob
+
+
+@needs_real
+def test_tourists_today_still_abstains(real):
+    r = ask(real, "¿cuántos turistas llegaron hoy?")
+    assert r["answerStatus"] == "abstencion"
+
+
+# ---------------------------------------------------------------- 3.7 culpabilidad
+@needs_real
+def test_guilt_question_gets_attribution_notice(real):
+    r = ask(real, "¿Es verdad que el exejecutivo del caso Pandora es culpable?")
+    assert r["answer"].startswith("Umbral no determina culpabilidad ni verdad.")
+    assert "atribución" in r["answer"]
+
+
+# ---------------------------------------------------------------- 3.8 plantilla del borrador
+@needs_real
+def test_drafts_have_clean_punctuation_distinct_questions_and_readable_script(real):
+    from umbral_api.drafts import build_template_package, spoken_part
+    from umbral_api.util import strip_markers, word_count
+
+    svc = real.svc
+    by_cat: dict[str, list[str]] = {}
+    for base in list(svc.bases.values())[:300]:
+        sc = svc._score(base, svc._impact_for(base, None))
+        pkg = build_template_package(base, score=sc.total, band=sc.band.value, status=base.status_for(False)[0].value)
+        for txt in (pkg.brief, pkg.script, pkg.social_copy, *pkg.research_questions):
+            assert not re.search(r"(?<![.…])\.\.(?!\.)", txt), txt
+        assert "GUION:" in pkg.script and "NOTAS DE PRODUCCIÓN:" in pkg.script
+        n = word_count(strip_markers(spoken_part(pkg.script)))
+        assert 110 <= n <= 150, (n, pkg.script)
+        assert "titular/metadatos" in pkg.brief
+        by_cat.setdefault(base.category.value, pkg.research_questions)
+    cats = [c for c in by_cat if c != "indeterminado"]
+    assert len(cats) >= 2
+    assert by_cat[cats[0]] != by_cat[cats[1]]
+
+
+# ---------------------------------------------------------------- 3.10 titular representativo
+@needs_real
+def test_spanish_headline_is_representative_when_available(real):
+    svc = real.svc
+    checked = 0
+    for base in svc.bases.values():
+        if any(a.language == "es" and not a.suspicious_instructions for a in base.articles):
+            assert base.representative.language == "es", (base.id, base.representative.title)
+            checked += 1
+    assert checked > 100
+    items = real.get("/api/v1/topics", params={"limit": 5}).json()["items"]
+    assert all("titleLanguage" in t for t in items)

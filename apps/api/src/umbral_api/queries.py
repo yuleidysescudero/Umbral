@@ -9,6 +9,7 @@ from datetime import timedelta
 
 from .cifras import exact_str, fmt_es, format_value_es, score_display
 from .models import (
+    CATEGORY_LABELS,
     AnswerStatus,
     Contradiction,
     DataMode,
@@ -124,8 +125,49 @@ SEISMIC_BOX_NOTE = "La caja regional (lat 5–12, lon −86 a −76) no equivale
 SEISMIC_DAMAGE_NOTE = "USGS no es evidencia de daños, inundaciones ni pérdidas."
 
 
+_RE_GUILT = re.compile(r"\bes (verdad|cierto|falso) que\b|\bculpables?\b|\binocentes?\b")
+_RE_GUILT_STRIP = re.compile(r"(?i)\bes (verdad|cierto|falso) que\b|\b(es|son|fue|fueron)\s+(culpables?|inocentes?)\b|\bculpables?\b|\binocentes?\b")
+# Listas de personas («quiénes son los culpables», «lista de sospechosos») siguen siendo perfilamiento: se rechazan.
+_RE_LIST_PROFILING = re.compile(r"\blista\b|\bquienes\b|\bque (personas|politicos|funcionarios)\b|\bcuales\b")
+_RE_SUMMARY = re.compile(
+    r"\bresum\w*|\bpanorama\b|\bnovedades\b|\bque (ha )?paso\b|\blo mas (importante|destacado)\b|"
+    r"\bprincipales (noticias|temas)\b|\bque hay de\b|\bcuentame\b|\bmuestrame\b"
+)
+_CATEGORY_WORDS: list[tuple[str, str]] = [
+    (r"\becono\w*|\bfinanz\w*|\bempleo\b|\bprecios\b", "economia"),
+    (r"\bcanal\b|\blogistic\w*|\bpuertos?\b|\btransitos?\b|\bnaviera\w*", "logistica_canal"),
+    (r"\bturis\w*|\bvisitantes\b|\bhotel\w*", "turismo"),
+    (r"\bservicios publicos\b|\bagua\b|\belectric\w*|\benergia\b|\bluz\b|\btransporte\b|\bbasura\b", "servicios_publicos"),
+    (r"\beventos naturales\b|\blluvias?\b|\bclima\b|\binundaci\w*|\bsism\w*|\bincendio\w*", "eventos_naturales"),
+    (r"\bregula\w*|\bleyes\b|\bley\b|\bnormativ\w*|\breforma\w*|\bdecreto\w*", "regulacion"),
+]
+
+
+def _period(f: str) -> tuple[str, timedelta, timedelta] | None:
+    """Expresión temporal → (texto, desde, hasta) relativos al corte del snapshot."""
+    if re.search(r"\bhoy\b", f):
+        return "hoy (24 h previas al corte)", timedelta(hours=24), timedelta(0)
+    if re.search(r"\bayer\b", f):
+        return "ayer (entre 24 y 48 h antes del corte)", timedelta(hours=48), timedelta(hours=24)
+    m = re.search(r"\bultim[oa]s?\s+(\d{1,2})\s+dias\b", f)
+    if m:
+        n = int(m.group(1))
+        return f"los últimos {n} días antes del corte", timedelta(days=n), timedelta(0)
+    if re.search(r"\besta semana\b|\bla semana\b|\bsemanal\b|\bultima semana\b", f):
+        return "los 7 días previos al corte", timedelta(days=7), timedelta(0)
+    if re.search(r"\beste mes\b|\bultimo mes\b|\bel mes\b", f):
+        return "los 30 días previos al corte", timedelta(days=30), timedelta(0)
+    return None
+
+
+def _category(f: str) -> str | None:
+    return next((cat for pat, cat in _CATEGORY_WORDS if re.search(pat, f)), None)
+
+
 def _detect_intent(q: str) -> QueryIntent:
     f = fold(q)
+    if _RE_SUMMARY.search(f) and (_category(f) or _period(f)) and not _RE_ASKS_QUANTITY.search(f):
+        return QueryIntent.resumen_periodo
     if _RE_VERIF.search(f):
         return QueryIntent.verificaciones
     if _RE_SEISMIC.search(f) and not _RE_HUMAN_IMPACT.search(f):
@@ -186,6 +228,24 @@ class QueryEngine:
                 "Ese texto se trata como dato y no se ejecuta; solo respondo con evidencia del corpus.",
                 warnings, missing=["Una pregunta sobre un tema del corpus."],
             )
+        guilt = _RE_GUILT.search(fold(q))
+        if guilt and not _RE_LIST_PROFILING.search(fold(q)):
+            # «¿Es verdad que X es culpable?»: se busca el hecho publicado y se presenta como atribución, nunca como veredicto.
+            topic_q = _RE_GUILT_STRIP.sub(" ", q).strip(" ¿?")
+            inner = self._busqueda(req.model_copy(update={"question": topic_q}), None, t0) if len(tokenize(topic_q)) >= 1 else None
+            first = next((c for c in (inner.citations if inner else []) if c.evidence_id in self.corpus.articles), None)
+            source = self.corpus.articles[first.evidence_id].outlet if first else "la fuente que lo publique"
+            notice = (
+                "Umbral no determina culpabilidad ni verdad. Lo publicado es una atribución: «señalado por…» "
+                f"según {source}. La responsabilidad penal solo la determina un tribunal."
+            )
+            if inner is None or inner.answer_status == AnswerStatus.abstencion:
+                return self._abstain(req, intent, t0, notice + " Además, no hay en el corpus una nota que respalde el hecho consultado.",
+                                     ["Pregunta de culpabilidad: se responde solo con atribuciones publicadas."])
+            inner.question = req.question
+            inner.answer = notice + "\n\n" + inner.answer
+            inner.warnings = ["Pregunta de culpabilidad: se muestran atribuciones publicadas, no un veredicto."] + inner.warnings
+            return inner
         if looks_like_profiling(q):
             return self._abstain(
                 req, intent, t0,
@@ -202,7 +262,9 @@ class QueryEngine:
 
         if intent == QueryIntent.eventos_sismicos and not self.corpus.events:
             intent = QueryIntent.busqueda  # paquete sin events.geojson (fixture): se buscan titulares
-        if intent == QueryIntent.eventos_sismicos:
+        if intent == QueryIntent.resumen_periodo:
+            resp = self._resumen(req, agenda, t0)
+        elif intent == QueryIntent.eventos_sismicos:
             resp = self._sismos(req, t0)
         elif intent == QueryIntent.agenda:
             resp = self._agenda(req, agenda, t0)
@@ -298,6 +360,16 @@ class QueryEngine:
                     out.append(raw)
         return list(dict.fromkeys(out))
 
+    def _as_written(self, question: str, toks) -> list[str]:  # noqa: ANN001
+        """Términos internos (raíz o corregidos) → la palabra tal como la escribió la persona."""
+        wanted = set(toks)
+        out: list[str] = []
+        for raw in re.findall(r"[\wáéíóúñü]+", question.lower()):
+            mapped, _ = self.index.expand_query(raw)
+            if any(m in wanted for m in mapped + tokenize(raw)) and raw not in out:
+                out.append(raw)
+        return out
+
     def _content_terms(self, question: str) -> set[str]:
         """Tokens de la pregunta que nombran contenido: sin países, años, números ni palabras de consulta."""
         skip: set[str] = set()
@@ -339,6 +411,68 @@ class QueryEngine:
             req, QueryIntent.agenda, t0, answer_status=AnswerStatus.respondida, answer=ans, citations=cites,
             related_topic_ids=[t.id for t in top],
             missing=[g for t in top for g in [f"{t.title}: ver verificaciones pendientes en la ficha."] if t.evidence_status.value != "suficiente"][:5],
+        )
+
+    def _resumen(self, req: QueryRequest, agenda: list[TopicSummary], t0: float) -> QueryResponse:
+        """«Dame el resumen de economía de esta semana»: categoría y periodo son filtros, no términos de búsqueda."""
+        f = fold(req.question)
+        cat, period = _category(f), _period(f)
+        rows = [t for t in agenda if cat is None or t.category.value == cat]
+        if cat is None:
+            rows = [t for t in rows if not t.out_of_scope]
+        undated = 0
+        by_detection: set[str] = set()
+        if period is not None:
+            _, since, until = period
+            lo, hi = self.corpus.cutoff - since, self.corpus.cutoff - until
+            kept = []
+            for t in rows:
+                when = t.last_published_at or t.first_published_at
+                if when is None and t.id in self.bases:
+                    # Sin fecha de publicación (GDELT): se usa la de detección y se dice.
+                    detected = [a.detected_at for a in self.bases[t.id].articles if a.detected_at]
+                    when = max(detected) if detected else None
+                    if when is not None:
+                        by_detection.add(t.id)
+                if when is None:
+                    undated += 1
+                elif lo <= when <= hi:
+                    kept.append(t)
+            rows = kept
+        label_cat = CATEGORY_LABELS.get(cat or "", "todas las categorías del reto").lower()
+        label_period = period[0] if period else "todo el snapshot"
+        cutoff_txt = fmt_date_pa(self.corpus.cutoff)
+        if not rows:
+            return self._abstain(
+                req, QueryIntent.resumen_periodo, t0,
+                f"no hay temas de {label_cat} publicados en {label_period} (corte del snapshot: {cutoff_txt}).",
+                missing=[f"Notas de {label_cat} en ese periodo; el snapshot solo cubre hasta su corte."],
+            )
+        top = rows[: max(1, min(req.limit, 5))]
+        lines: list[str] = []
+        cites: list[QueryCitation] = []
+        for i, t in enumerate(top, 1):
+            base = self.bases.get(t.id)
+            rep = base.representative if base else None
+            lines.append(
+                f"{i}. **{t.title}** · puntaje {score_display(t.score)} ({t.band.value}) · "
+                f"{t.independent_provenances} procedencia(s) independiente(s) · evidencia {t.evidence_status_label.lower()}"
+            )
+            if rep is not None and not rep.suspicious_instructions:
+                cites.append(QueryCitation(evidence_id=rep.id, field="title", passage=rep.title, title=rep.title, url=rep.url))
+        ans = (
+            f"**Resumen de {label_cat} · {label_period}** (relativo al corte del snapshot, {cutoff_txt}). "
+            f"{len(rows)} tema(s); se muestran los {len(top)} de mayor puntaje.\n\n"
+            + "\n".join(lines)
+            + "\n\nBasado únicamente en titular/metadatos: el puntaje ordena la atención, no demuestra verdad."
+            + (f" {len(by_detection & {t.id for t in top})} de estos temas no tienen fecha de publicación: se filtró por fecha de detección." if by_detection & {t.id for t in top} else "")
+            + (f" {undated} tema(s) sin ninguna fecha quedaron fuera del filtro de periodo." if undated else "")
+        )
+        return self._base_resp(
+            req, QueryIntent.resumen_periodo, t0,
+            answer_status=AnswerStatus.respondida if cites else AnswerStatus.parcial, answer=ans, citations=cites,
+            related_topic_ids=[t.id for t in top], coverage=1.0,
+            missing=[f"{t.title}: ver verificaciones pendientes en la ficha." for t in top if t.evidence_status.value != "suficiente"][:5],
         )
 
     def _sismos(self, req: QueryRequest, t0: float) -> QueryResponse:
@@ -527,7 +661,7 @@ class QueryEngine:
         if not hits:
             return self._abstain(
                 req, QueryIntent.busqueda, t0, "ningún documento del corpus coincide con los términos de la consulta.",
-                missing=[f"Cobertura para: {', '.join(unmatched or qtoks) or req.question}."],
+                missing=[f"Cobertura para: {', '.join(self._as_written(req.question, unmatched or qtoks)) or req.question}."],
             )
         best = hits[0]
         coverage = round(best.coverage, 3)
@@ -535,9 +669,9 @@ class QueryEngine:
             return self._abstain(
                 req, QueryIntent.busqueda, t0,
                 f"la mejor coincidencia cubre menos de la mitad de los términos de la consulta (términos sin respaldo: "
-                f"{', '.join(sorted(set(qtoks) - set(best.matched))) or '—'}).",
+                f"{', '.join(self._as_written(req.question, set(qtoks) - set(best.matched))) or '—'}).",
                 hits=hit_models, coverage=coverage, matched=best.matched,
-                missing=[f"Evidencia que mencione: {', '.join(sorted(set(qtoks) - set(best.matched)))}."],
+                missing=[f"Evidencia que mencione: {', '.join(self._as_written(req.question, set(qtoks) - set(best.matched)))}."],
             )
         # ¿pide una cifra? solo se responde si algún titular relevante la contiene
         wants_number = bool(_RE_NUMERIC.search(fold(req.question)))

@@ -27,6 +27,55 @@ SCRIPT_MIN_WORDS = int(SCRIPT_MIN_S * SCRIPT_WPS)  # 112
 SCRIPT_MAX_WORDS = int(SCRIPT_MAX_S * SCRIPT_WPS)  # 150
 HEADLINE_PREFIX = "Basado únicamente en titular/metadatos."
 
+
+# Fuente primaria por categoría: las preguntas de investigación dicen a quién llamar, no solo «una fuente oficial».
+PRIMARY_SOURCE: dict[str, tuple[str, str]] = {
+    "logistica_canal": ("la Autoridad del Canal de Panamá (ACP)", "avisos a navieras y estadísticas de tránsito"),
+    "economia": ("el MEF y la Contraloría General", "informes de ejecución presupuestaria y del INEC"),
+    "servicios_publicos": ("la ASEP", "resoluciones tarifarias y reportes de interrupciones"),
+    "turismo": ("la Autoridad de Turismo de Panamá (ATP)", "estadísticas de llegada de visitantes"),
+    "eventos_naturales": ("SINAPROC", "informes de afectación y alertas oficiales"),
+    "regulacion": ("la Gaceta Oficial y la Asamblea Nacional", "texto del proyecto o de la norma sancionada"),
+    "indeterminado": ("la institución responsable del tema", "documento oficial que respalde el hecho"),
+}
+SCRIPT_NOTES_LABEL = "NOTAS DE PRODUCCIÓN"
+
+
+def _tidy(text: str) -> str:
+    """Puntuación limpia al unir listas: sin «..» ni «;.» (se respeta «…» y el texto del titular)."""
+    text = re.sub(r"(?<![.…])\.\s*\.(?!\.)", ".", text)
+    text = re.sub(r"[;,]\s*\.", ".", text)
+    return text
+
+
+def spoken_part(script: str) -> str:
+    """Lo que se lee al aire: el guion sin las notas de producción."""
+    return script.split(SCRIPT_NOTES_LABEL)[0].replace("GUION:", "").strip()
+
+
+def research_questions(base: TopicBase) -> list[str]:
+    """Tres preguntas según la categoría y lo que falta (fuente primaria, fecha, cifras, contradicciones)."""
+    name, doc = PRIMARY_SOURCE.get(base.category.value, PRIMARY_SOURCE["indeterminado"])
+    qs = [f"¿Qué dice exactamente {name} sobre este hecho? Pedir {doc}."]
+    if base.contradictions:
+        qs.append("¿Por qué difieren las cifras entre medios: es una actualización o una contradicción? Comparar fechas y fuente primaria.")
+    elif base.is_recirculation or base.first_published is None:
+        qs.append("¿Cuál es la fecha original del hecho? Si es una nota recirculada, ¿qué cambió desde entonces?")
+    elif base.independent < 2:
+        qs.append("¿Qué segunda fuente independiente (no una réplica de la misma agencia) confirma el hecho?")
+    else:
+        qs.append("¿Coinciden los medios en los datos clave o solo replican el mismo titular?")
+    by_cat = {
+        "logistica_canal": "¿Cómo afecta a navieras, exportadores y al ingreso del Canal, según datos de la ACP de este año?",
+        "economia": "¿Qué impacto tiene en el bolsillo de los panameños según cifras del INEC o del MEF, y de qué periodo son?",
+        "servicios_publicos": "¿Qué comunidades o usuarios se ven afectados y qué plazos o tarifas ha fijado la ASEP?",
+        "turismo": "¿Cómo se compara con las estadísticas de la ATP del mismo periodo del año anterior?",
+        "eventos_naturales": "¿Hay afectados, daños o evacuaciones confirmados por SINAPROC? Sin ese reporte no se informan cifras.",
+        "regulacion": "¿En qué etapa está la norma (debate, sanción, reglamentación) y a quién obliga?",
+    }
+    qs.append(by_cat.get(base.category.value, "¿Qué dato oficial dimensiona el alcance del tema y de qué periodo proviene?"))
+    return qs
+
 ARTICLE_FIELDS = ("title", "outlet", "publishedAt", "detectedAt", "url", "origin", "category")
 INDICATOR_FIELDS = ("value", "unit", "year", "countryIso3", "indicatorName")
 
@@ -173,7 +222,7 @@ def validate_package(pkg: EditorialPackage, pack: EvidencePack, *, proposed_clai
     if headline_only and fold(HEADLINE_PREFIX.rstrip(".")) not in fold(brief):
         brief = f"{HEADLINE_PREFIX} {brief}".strip()
 
-    wc = {"brief": word_count(strip_markers(brief)), "script": word_count(strip_markers(script)), "socialCopy": word_count(strip_markers(copy))}
+    wc = {"brief": word_count(strip_markers(brief)), "script": word_count(strip_markers(spoken_part(script))), "socialCopy": word_count(strip_markers(copy))}
     if wc["brief"] > BRIEF_MAX_WORDS:
         issues.append(ValidationIssue(code="brief_excede_limite", severity="error", message=f"El brief tiene {wc['brief']} palabras (máximo {BRIEF_MAX_WORDS})."))
     if wc["socialCopy"] > COPY_MAX_WORDS:
@@ -269,7 +318,7 @@ def build_template_package(base: TopicBase, *, score: float, band: str, status: 
             citations=[],
         )
     )
-    rep = base.usable_articles[0] if base.usable_articles else base.representative
+    rep = base.representative if not base.representative.suspicious_instructions else (base.usable_articles[0] if base.usable_articles else base.representative)
     first_decl = decl[0] if decl else None
     outlet = rep.outlet if not rep.suspicious_instructions else "una fuente no confiable"
     title = rep.title if not rep.suspicious_instructions else MASKED_TITLE
@@ -292,43 +341,46 @@ def build_template_package(base: TopicBase, *, score: float, band: str, status: 
     parts.append(
         f"Evidencia {status_txt}; puntaje de atención {score_display(score)} ({band}), que ordena la revisión y no demuestra verdad."
     )
-    parts.append("Falta verificar: " + "; ".join(pending[:3]) + ".")
-    brief = " ".join(parts)
+    parts.append("Falta verificar: " + "; ".join(p.rstrip(". ") for p in pending[:3]) + ".")
+    brief = _tidy(" ".join(parts))
     while word_count(strip_markers(brief)) > 235 and len(parts) > 4:
         parts.pop(-3 if len(parts) > 5 else -2)
-        brief = " ".join(parts)
+        brief = _tidy(" ".join(parts))
 
-    when = fmt_date_pa(base.first_published, unknown="fecha de publicación no confirmada")
-    script_parts = [
-        f"Tema en revisión editorial: {title.strip()}.",
-        f"Según el titular de {outlet}{first_marker}, esto es lo que se reporta; la fecha original es {when}.",
+    when = fmt_date_pa(base.first_published, unknown="sin fecha de publicación confirmada")
+    src = PRIMARY_SOURCE.get(base.category.value, PRIMARY_SOURCE["indeterminado"])
+    # GUION: lo que lee el presentador. Solo hechos atribuidos (quién lo publicó y cuándo), nada sin fuente.
+    spoken = [
+        f"{outlet} informó en su titular que {title.strip().rstrip(' .')}{first_marker}.",
     ]
+    for c in decl[1:3]:
+        spoken.append(f"La información también aparece en {c.text.split(' reporta')[0]} [{c.id}].")
     if facts:
-        script_parts.append(f"Como contexto oficial: {facts[0].text} [{facts[0].id}]")
-    script_parts += [
-        f"Por ahora la evidencia es {status_txt}: solo contamos con titulares y metadatos, sin el texto completo.",
-        f"Antes de cualquier uso editorial falta verificar lo siguiente: {pending[0].rstrip('.')}.",
-        "Este guion es un borrador para revisión humana; no incluye entrevistas, imágenes ni declaraciones que no estén respaldadas.",
-        "Se recomienda confirmar la fecha original y la fuente primaria antes de avanzar con cualquier pieza.",
-        "La decisión editorial final corresponde a la persona responsable de la revisión.",
+        spoken.append(f"Como contexto, {facts[0].text.rstrip('.')} [{facts[0].id}].")
+    spoken.append(f"La publicación original está fechada el {when}." if base.first_published else "La fecha original de la publicación todavía no está confirmada.")
+    pads = [
+        "Hasta este momento, lo que se conoce proviene de los titulares publicados y no del texto completo de las notas.",
+        f"El equipo de TVN consulta a {src[0]} para confirmar los detalles antes de ampliar la información.",
+        "Es una información en desarrollo y cualquier cifra adicional se dará con su fuente y su fecha.",
+        "Si hay versiones distintas entre medios, se informarán ambas con su fuente, sin dar una por cierta.",
+        "Ampliaremos esta información en cuanto exista confirmación de una fuente oficial.",
+        "Les recordamos que en TVN cada dato se atribuye a la fuente que lo publicó.",
     ]
-    script = " ".join(script_parts)
-    # ajustar a 45-60 s
-    fillers = [
-        "Recuerda que el puntaje de atención solo ordena temas y no equivale a una verificación de los hechos.",
-        "Si aparece una segunda fuente independiente, el estado de la evidencia puede cambiar.",
-        "Cualquier cifra que se mencione debe citar su fuente, su año y su unidad.",
-    ]
-    fi = 0
-    while word_count(strip_markers(script)) < SCRIPT_MIN_WORDS + 6 and fi < len(fillers):
-        script += " " + fillers[fi]
-        fi += 1
-    while word_count(strip_markers(script)) > SCRIPT_MAX_WORDS - 4 and len(script_parts) > 5:
-        script_parts.pop(-2)
-        script = " ".join(script_parts)
-    if word_count(strip_markers(script)) > SCRIPT_MAX_WORDS - 2:  # titular muy largo
-        words = strip_markers(script).split()
-        script = " ".join(words[: SCRIPT_MAX_WORDS - 6]) + "."
+    pi = 0
+    while word_count(strip_markers(" ".join(spoken))) < SCRIPT_MIN_WORDS + 2 and pi < len(pads):
+        spoken.append(pads[pi])
+        pi += 1
+    while word_count(strip_markers(" ".join(spoken))) > SCRIPT_MAX_WORDS - 2 and len(spoken) > 2:
+        spoken.pop(-2)
+    guion = " ".join(spoken)
+    if word_count(strip_markers(guion)) > SCRIPT_MAX_WORDS - 2:  # titular muy largo
+        guion = " ".join(strip_markers(guion).split()[: SCRIPT_MAX_WORDS - 6]) + "."
+    notes = [f"Evidencia {status_txt}; basado únicamente en titular/metadatos."]
+    notes += [f"Verificar: {p.rstrip('.')}." for p in pending[:3]]
+    notes.append(f"Fuente primaria a consultar: {src[0]} ({src[1]}).")
+    if base.contradictions:
+        notes.append("Hay versiones incompatibles entre fuentes: no leer una cifra hasta resolverlas.")
+    script = _tidy(f"GUION: {guion}\n\n{SCRIPT_NOTES_LABEL}: " + " ".join(notes))
 
     copy_core = f"{title.strip()}"
     cwords = copy_core.split()
@@ -343,15 +395,7 @@ def build_template_package(base: TopicBase, *, score: float, band: str, status: 
         f"Posible interés público en {CATEGORY_LABELS[base.category.value].lower()} para Panamá; el alcance real "
         "depende de verificar la fuente primaria y la fecha original."
     )
-    qs = [
-        "¿Qué fuente primaria u oficial confirma el hecho y qué dice exactamente?",
-        "¿Cuál es la fecha original del hecho y cómo cambia la lectura si es una noticia recirculada?",
-        (
-            "¿Qué impacto concreto tiene para la audiencia en Panamá según datos oficiales y de qué año provienen?"
-            if base.indicators
-            else "¿Qué dato oficial pertinente existe para dimensionar el alcance y de qué período proviene?"
-        ),
-    ]
+    qs = research_questions(base)
     limitations = [
         "Basado únicamente en titular/metadatos.",
         "Las citas verifican estructura, no sustento: requieren revisión humana.",

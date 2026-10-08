@@ -274,6 +274,7 @@ class Services:
             category_label=CATEGORY_LABELS[base.category.value],
             score=score.total,
             score_display=score_display(score.total),
+            title_language=base.representative.language,
             band=score.band,
             score_components=score.components if with_components else [],
             urgency=score.urgency_tiebreak,
@@ -601,7 +602,7 @@ class Services:
         limit = min(30, self.settings.queries_per_minute) if self.settings.auth_mode == "public" else self.settings.queries_per_minute
         self.limiter.check(user, "queries", limit)
         agenda = [s for s in self.list_topics(
-            user, limit=5, category=None, evidence=None, band=None, review_status=None, q=None, include_components=False
+            user, limit=1000, category=None, evidence=None, band=None, review_status=None, q=None, include_components=False
         ).items]
         response = self.engine.answer(req, agenda)
         response.rules_version = self.rules(user).rules_version

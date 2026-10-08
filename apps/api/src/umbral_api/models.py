@@ -361,6 +361,7 @@ class TopicSummary(ApiModel):
     category: Category
     category_label: str
     score: float
+    title_language: str | None = Field(None, description="Idioma del titular representativo; si no es 'es', la web muestra «Titular en inglés» (sin traducir).")
     score_display: str = Field("", description="Puntaje redondeado una sola vez en la API (ROUND_HALF_UP, coma decimal); la web lo muestra tal cual.")
     band: ScoreBand
     score_components: list[ScoreComponent] = Field(default_factory=list)

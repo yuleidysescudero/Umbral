@@ -274,6 +274,9 @@ def build_topic(corpus: Corpus, cluster: dict) -> TopicBase | None:
     rep = corpus.articles.get(cluster.get("representativeArticleId", ""), arts[0])
     if rep.suspicious_instructions:
         rep = next((a for a in arts if not a.suspicious_instructions), rep)
+    if (rep.language or "es") != "es":
+        # QA TVN 3.10: si el grupo tiene un titular en español, ese es el representante (el original sigue en las citas).
+        rep = next((a for a in arts if a.language == "es" and not a.suspicious_instructions), rep)
     # Una fecha posterior al corte se ignora (límite visible)
     valid_pubs = [a.published_at for a in arts if a.published_at and a.published_at <= cutoff]
     issue = None

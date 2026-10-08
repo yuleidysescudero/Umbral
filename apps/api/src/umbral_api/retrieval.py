@@ -20,6 +20,9 @@ STOPWORDS = {
     "ocurre", "reporta", "reporto", "reportan", "hubo", "existe", "existen", "tema", "temas", "cuanto", "cuantos",
     "cuanta", "cuantas", "favor", "puedes", "podrias", "quiero", "necesito", "hoy", "ultimo", "ultima",
     "ultimos", "ultimas", "reciente", "recientes", "cuenta",
+    # QA TVN 3.6: peticiones de redacción y expresiones temporales (son filtro o forma, no contenido)
+    "resumen", "resume", "resumeme", "resumir", "cuentame", "muestrame", "lista", "listame", "panorama", "novedades",
+    "semana", "mes", "ayer", "dias", "principales", "importante", "importantes", "destacado", "destacados",
 }
 
 
@@ -85,6 +88,9 @@ class SearchIndex:
                 out.append(t)
                 continue
             best = process.extractOne(t, self.vocab, scorer=fuzz.ratio, score_cutoff=84) if self.vocab else None
+            # Solo errores de tipeo: misma inicial y ±1 letra. «resumen» → «presumen» cambia el significado.
+            if best and (best[0][:1] != t[:1] or abs(len(best[0]) - len(t)) > 1):
+                best = None
             if best:
                 out.append(best[0])
             else:
