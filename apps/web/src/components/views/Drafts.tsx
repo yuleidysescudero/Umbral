@@ -31,6 +31,7 @@ import { CLAIM_HELP, CLAIM_LABEL, FALLBACK_LABEL, PROVIDER_CHOICES, REVIEW_LABEL
 import { fmtDateTime, fmtNumber, pct } from '../../lib/format';
 import { useEntrance } from '../../lib/useMotion';
 import { useApp } from '../context';
+import { compartirDecision } from '../../lib/mesa';
 import {
   Button,
   Card,
@@ -461,7 +462,8 @@ function DraftEditor({ detail, draft, caseView, reviewer }: { detail: TopicDetai
 // --------------------------------------------------------------------------- revisión
 
 function ReviewPanel({ detail, caseView }: { detail: TopicDetail; caseView: CaseView }) {
-  const { reviewer, setReviewer } = useApp();
+  const { reviewer, setReviewer, session } = useApp();
+  const [compartida, setCompartida] = useState<boolean | null>(null);
   const review = useReview(detail.summary.id, caseView.caseId);
   const [baseVersion, setBaseVersion] = useState(caseView.version);
   const [comment, setComment] = useState('');
@@ -487,7 +489,13 @@ function ReviewPanel({ detail, caseView }: { detail: TopicDetail; caseView: Case
         evidenceConfirmed: confirm === 'unset' ? null : confirm === 'yes',
         primarySourceConfirmed: primary === 'unset' ? null : primary === 'yes',
       },
-      { onSuccess: (updated) => { setComment(''); setBaseVersion(updated.version); } },
+      { onSuccess: (updated) => {
+          setComment(''); setBaseVersion(updated.version);
+          // Mesa compartida: copia la decisión ya validada para que el equipo la vea (no cambia la revisión local).
+          if (session?.modo === 'compartido') {
+            void compartirDecision(session, detail.summary.id, detail.summary.title, to, comment.trim() || null).then(setCompartida);
+          }
+        } },
     );
 
   const blockedReason = (to: ReviewStatus): string | null => {
@@ -516,6 +524,11 @@ function ReviewPanel({ detail, caseView }: { detail: TopicDetail; caseView: Case
         Versión del caso: <strong data-testid="case-version">{caseView.version}</strong>
         {caseView.reviewer ? <> · última persona responsable: <strong>{caseView.reviewer}</strong></> : null}. Aprobar como borrador <strong>no equivale a publicar</strong>.
       </p>
+      {compartida !== null && (
+        <p className={`mb-3 text-sm font-semibold ${compartida ? 'text-ok' : 'text-warn'}`} data-testid="review-shared" role="status">
+          {compartida ? 'Decisión compartida con la mesa del equipo.' : 'Guardada en este navegador; no se pudo compartir con la mesa (sin conexión).'}
+        </p>
+      )}
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Persona responsable" htmlFor={idR} hint="Queda registrada en el historial.">
           <input id={idR} data-testid="review-reviewer" className={inputCls} value={reviewer} onChange={(e) => setReviewer(e.target.value)} placeholder="Nombre y apellido" autoComplete="name" />

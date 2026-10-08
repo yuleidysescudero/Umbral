@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { Bot, ChevronDown, Database, FileSearch, FlaskConical, ListOrdered, PenLine, WifiOff } from 'lucide-react';
+import { Bot, ChevronDown, Database, FileSearch, FlaskConical, ListOrdered, LogOut, PenLine, Users, WifiOff } from 'lucide-react';
 import type { BootProgress, UmbralApi } from '../lib/api/client';
 import { resolveApi } from '../lib/api';
 import { initAuth, type AuthState } from '../lib/auth';
@@ -16,6 +16,9 @@ import { Agenda } from './views/Agenda';
 import { Ficha } from './views/Ficha';
 import { Drafts } from './views/Drafts';
 import { Sources } from './views/Sources';
+import { Mesa } from './views/Mesa';
+import { SessionGate } from './SessionGate';
+import { guardarSesion, leerSesion, ROLES, type Session } from '../lib/session';
 import { Assistant } from './Assistant';
 import { Button, ErrorBox, Loading, Notice, Pill } from './ui';
 
@@ -25,6 +28,22 @@ const NAV: { view: Route['view']; label: string; icon: typeof ListOrdered; testI
   { view: 'borradores', label: 'Borradores', icon: PenLine, testId: 'nav-borradores' },
   { view: 'fuentes', label: 'Fuentes y evaluación', icon: Database, testId: 'nav-fuentes' },
 ];
+// Builds con sesión por rol (MEGA en Vercel): entrada sin contraseña y mesa compartida del equipo.
+export const SESSION_GATE = String(import.meta.env.PUBLIC_SESSION_GATE ?? '') === '1';
+const NAV_MESA = { view: 'mesa' as const, label: 'Mesa', icon: Users, testId: 'nav-mesa' };
+
+function SessionChip() {
+  const { session, salir } = useApp();
+  if (!SESSION_GATE || !session) return null;
+  return (
+    <span className="hidden items-center gap-2 border-2 border-ink bg-amber-100 px-2 py-1 text-xs font-semibold sm:inline-flex" data-testid="session-chip">
+      <span className="whitespace-nowrap" data-mode={session.modo}>{ROLES[session.rol].nombre}{session.modo === 'compartido' ? ' · equipo' : ' · local'}</span>
+      <button type="button" onClick={salir} aria-label="Cambiar de rol" className="inline-flex items-center gap-1 whitespace-nowrap underline">
+        <LogOut size={14} aria-hidden="true" />Cambiar
+      </button>
+    </span>
+  );
+}
 
 function StatusItem({ label, children, testId }: { label: string; children: ReactNode; testId?: string }) {
   return (
@@ -157,7 +176,7 @@ function Shell({ assistantOpen, setAssistantOpen, seed }: { assistantOpen: boole
             Umbral<span className="text-amber-600">.</span>
           </a>
           <nav aria-label="Vistas principales" className="comic-tabbar flex gap-1 md:justify-center">
-            {NAV.map(({ view, label, icon: Ico, testId }) => {
+            {(SESSION_GATE ? [...NAV, NAV_MESA] : NAV).map(({ view, label, icon: Ico, testId }) => {
               const active = route.view === view;
               return (
                 <a
@@ -167,7 +186,7 @@ function Shell({ assistantOpen, setAssistantOpen, seed }: { assistantOpen: boole
                   aria-current={active ? 'page' : undefined}
                   onClick={(e) => {
                     e.preventDefault();
-                    go(view === 'agenda' || view === 'fuentes' ? { view } : { view, topicId: lastTopic.current });
+                    go(view === 'agenda' || view === 'fuentes' || view === 'mesa' ? { view } : { view, topicId: lastTopic.current });
                   }}
                   className={`comic-nav inline-flex min-h-11 shrink-0 items-center gap-1.5 px-3 py-1.5 text-sm font-semibold ${
                     active ? 'border-amber-600 bg-amber-100 text-ink' : 'border-transparent text-ink-2 hover:bg-sunk'
@@ -186,17 +205,19 @@ function Shell({ assistantOpen, setAssistantOpen, seed }: { assistantOpen: boole
               );
             })}
           </nav>
-          <Button
-            variant={assistantOpen ? 'primary' : 'secondary'}
-            icon={Bot}
-            onClick={() => setAssistantOpen(!assistantOpen)}
-            aria-expanded={assistantOpen}
-            aria-controls="assistant-panel"
-            data-testid="assistant-toggle"
-            className="ml-auto md:ml-0 md:justify-self-end"
-          >
-            <span className="@max-3xl:sr-only">Asistente</span>
-          </Button>
+          <div className="ml-auto flex items-center gap-2 md:ml-0 md:justify-self-end">
+            <SessionChip />
+            <Button
+              variant={assistantOpen ? 'primary' : 'secondary'}
+              icon={Bot}
+              onClick={() => setAssistantOpen(!assistantOpen)}
+              aria-expanded={assistantOpen}
+              aria-controls="assistant-panel"
+              data-testid="assistant-toggle"
+            >
+              <span className="@max-3xl:sr-only">Asistente</span>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -207,6 +228,7 @@ function Shell({ assistantOpen, setAssistantOpen, seed }: { assistantOpen: boole
           {route.view === 'ficha' && <Ficha />}
           {route.view === 'borradores' && <Drafts />}
           {route.view === 'fuentes' && <Sources />}
+          {route.view === 'mesa' && <Mesa />}
         </div>
         <footer className="mt-8 border-t border-rule pt-3 text-xs text-ink-3">
           Umbral prioriza la atención editorial y prepara borradores para revisión humana. No publica, no etiqueta noticias como verdaderas o falsas y no sustituye el criterio del equipo.
@@ -227,6 +249,7 @@ function Inner() {
   const [bootError, setBootError] = useState<string | null>(null);
   const [route, go] = useRoute();
   const [reviewer, setReviewerState] = useState(() => readLocal('umbral.reviewer', ''));
+  const [session, setSession] = useState<Session | null>(() => (SESSION_GATE ? leerSesion() : null));
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [seed, setSeed] = useState({ text: '', n: 0 });
 
@@ -259,6 +282,8 @@ function Inner() {
     setReviewerState(name);
     writeLocal('umbral.reviewer', name);
   }, []);
+  const salir = useCallback(() => { guardarSesion(null); setSession(null); }, []);
+  const onEnter = useCallback((s: Session) => { setSession(s); setReviewer(s.nombre); }, [setReviewer]);
   const openAssistant = useCallback((prompt?: string) => {
     setAssistantOpen(true);
     if (prompt) setSeed((s) => ({ text: prompt, n: s.n + 1 }));
@@ -276,11 +301,14 @@ function Inner() {
             setReviewer,
             openAssistant,
             authMode: boot.auth.mode,
+            session,
+            salir,
           }
         : null,
-    [boot, route, go, reviewer, setReviewer, openAssistant],
+    [boot, route, go, reviewer, setReviewer, openAssistant, session, salir],
   );
 
+  if (SESSION_GATE && !session) return <SessionGate onEnter={onEnter} />;
   if (bootError) return <div className="mx-auto max-w-xl p-6" data-testid="app-boot-error"><ErrorBox error={new Error(bootError)} onRetry={() => setBootAttempt((value) => value + 1)} /></div>;
   if (!ctx) return <div className="mx-auto max-w-xl p-6" data-testid="app-loading"><Loading label={progress?.message ?? "Iniciando Umbral…"} />{progress && <p className="text-sm text-ink-3" aria-live="polite">Intento {progress.attempt} · {Math.floor(progress.elapsedMs / 1000)} s. El primer inicio puede tardar hasta 90 segundos.</p>}</div>;
   return (

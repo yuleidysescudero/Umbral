@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { UmbralApi } from '../lib/api/client';
 import type { Route } from '../lib/router';
+import type { Session } from '../lib/session';
 
 export interface AppCtx {
   api: UmbralApi;
@@ -11,6 +12,9 @@ export interface AppCtx {
   setReviewer: (name: string) => void;
   openAssistant: (prompt?: string) => void;
   authMode: 'public' | 'local' | 'firebase-anonymous';
+  /** Sesión por rol (solo builds con PUBLIC_SESSION_GATE=1). */
+  session?: Session | null;
+  salir?: () => void;
 }
 
 export const AppContext = createContext<AppCtx | null>(null);
