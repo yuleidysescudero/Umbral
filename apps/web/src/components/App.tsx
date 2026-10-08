@@ -29,7 +29,7 @@ const NAV: { view: Route['view']; label: string; icon: typeof ListOrdered; testI
   { view: 'fuentes', label: 'Fuentes y evaluación', icon: Database, testId: 'nav-fuentes' },
 ];
 // Builds con sesión por rol (MEGA en Vercel): entrada sin contraseña y mesa compartida del equipo.
-export const SESSION_GATE = String(import.meta.env.PUBLIC_SESSION_GATE ?? '') === '1';
+export const SESSION_GATE = String(import.meta.env.PUBLIC_SESSION_GATE ?? '').trim() === '1';
 const NAV_MESA = { view: 'mesa' as const, label: 'Mesa', icon: Users, testId: 'nav-mesa' };
 
 function SessionChip() {
