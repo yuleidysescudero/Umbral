@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import time
 import uuid
+from datetime import timedelta
 
 from .models import (
     AnswerStatus,
@@ -21,7 +22,7 @@ from .models import (
 )
 from .retrieval import Doc, SearchIndex, fold, tokenize
 from .scoring import RULES_VERSION
-from .security import looks_like_instruction
+from .security import looks_like_instruction, looks_like_profiling
 from .snapshot import Corpus
 from .topics import COUNTRY_KEYWORDS, INDICATOR_KEYWORDS, MASKED_TITLE, TopicBase
 from .util import fmt_date_pa
@@ -56,6 +57,62 @@ _RE_VERIF = re.compile(r"falta(n)?\s+(por\s+)?verificar|verificaciones?|pendient
 _RE_ECON = re.compile(r"contexto economico|indicadores?|banco mundial|\bpib\b|inflacion|desempleo|poblacion|\binternet\b|exportacion|crecimiento economico")
 _RE_NUMERIC = re.compile(r"\bcuant[oa]s?\b|\bcifra\b|\bmonto\b|\bporcentaje\b|\bnumero de\b|\btotal de\b|\bcuanto cuesta\b")
 _RE_YEAR = re.compile(r"\b((?:19|20)\d{2})\b")
+_RE_TODAY = re.compile(r"\bhoy\b|\bactual(es|mente)?\b|\beste (ano|mes)\b|\bahora\b|\besta semana\b")
+# Palabras de la consulta que no nombran tema, país ni indicador («según», «fue»…): no son entidades desconocidas.
+_QUERY_WORDS = {
+    "segun", "fue", "era", "es", "son", "registro", "registra", "reporta", "reporto", "dice", "dijo", "indica",
+    "tuvo", "tiene", "hubo", "hay", "cuanto", "cuanta", "cuantos", "cuantas", "sabe", "saber", "informa",
+}
+
+_MONEY = r"(\$|us\$|b/\.|usd)\s*\d|\d[\d.,]*\s*(millones|mil millones|dolares|balboas)"
+# Tipo de cifra pedida → (etiqueta, patrón en la pregunta, patrón que debe tener UN titular pertinente, qué falta).
+# «¿Cuántos murieron por el sismo?» no se responde con «Sismo de magnitud 5,4»: tener un número no basta.
+_NUMBER_KINDS = [
+    ("pérdidas económicas",
+     re.compile(r"perd(io|ieron|ida|idas|ido)\b|\bperdidas?\b|danos economicos|impacto economico"),
+     re.compile(r"(perdida|perdio|perdieron|danos|impacto|afectacion).{0,80}(" + _MONEY + r")|(" + _MONEY
+                + r").{0,80}(perdida|danos|impacto)"),
+     "Una estimación oficial de pérdidas con monto, moneda y periodo."),
+    ("una cifra de personas",
+     re.compile(r"cuant[oa]s\s+(personas|muertos|fallecidos|murieron|heridos|evacuados|afectados|victimas|turistas|"
+                r"visitantes|trabajadores|empleos|familias)|cuant[oa]s\s+\w+\s+(murieron|fallecieron|resultaron)"),
+     re.compile(r"\d[\d.,]*\s*(personas|muert|fallec|herid|evacuad|afectad|victimas|turistas|visitantes|trabajador|"
+                r"empleos|familias)"),
+     "El conteo oficial con fecha de corte y la institución que lo publica (SINAPROC, MINSA u otra)."),
+    ("un monto en dinero",
+     re.compile(r"\bdinero\b|\bmonto\b|cuanto (cuesta|costo|recaud|invirt|pag)|\bdolares\b|\bbalboas\b"),
+     re.compile(_MONEY),
+     "El monto oficial con moneda, periodo y fuente."),
+    ("un porcentaje",
+     re.compile(r"\bporcentaje\b|por ciento|%"),
+     re.compile(r"\d[\d.,]*\s*(%|por ciento)"),
+     "El indicador con su unidad (%), el periodo y la fuente oficial."),
+]
+
+
+_RE_ASKS_QUANTITY = re.compile(r"\bcuant[oa]s?\b|\bcifra\b|\bmonto\b|\bporcentaje\b|\bnumero de\b|\btotal de\b|por ciento")
+# Para conteos de personas, la cifra del titular debe ser del MISMO tipo: «3 heridos» no responde «¿cuántos murieron?».
+_PERSON_FAMILIES = [
+    (r"muert|murier|fallec|victimas mortales", r"muert|fallec|decesos?|vidas"),
+    (r"herid", r"herid|lesionad"),
+    (r"evacu", r"evacu"),
+    (r"afectad|damnificad", r"afectad|damnificad"),
+    (r"turist|visitant", r"turist|visitant|pasajer"),
+    (r"emple|trabajador", r"emple|trabajador|puestos"),
+    (r"familias", r"familias"),
+]
+
+
+def _number_kind(folded_question: str) -> tuple[str, re.Pattern[str], re.Pattern[str], str] | None:
+    if not _RE_ASKS_QUANTITY.search(folded_question):
+        return None  # mencionar «dinero» o «pérdidas» no es pedir una cifra
+    kind = next((k for k in _NUMBER_KINDS if k[1].search(folded_question)), None)
+    if kind is not None and kind[0] == "una cifra de personas":
+        nouns = [ev for asked, ev in _PERSON_FAMILIES if re.search(asked, folded_question)]
+        if nouns:
+            evidence = re.compile(r"\d[\d.,]*\s*(\w+\s+){0,2}(" + "|".join(nouns) + ")")
+            return (kind[0], kind[1], evidence, kind[3])
+    return kind
 
 
 def _detect_intent(q: str) -> QueryIntent:
@@ -97,6 +154,22 @@ class QueryEngine:
                 "La consulta contiene texto con forma de instrucción; se trata solo como texto de búsqueda y no cambia el comportamiento del sistema."
             )
         intent = _detect_intent(q)
+        if warnings:
+            # T07: la instrucción no se ejecuta ni se busca; se rechaza de forma explícita y auditable.
+            return self._abstain(
+                req, intent, t0,
+                "la consulta intenta cambiar las reglas del sistema o revelar su configuración. "
+                "Ese texto se trata como dato y no se ejecuta; solo respondo con evidencia del corpus.",
+                warnings, missing=["Una pregunta sobre un tema del corpus."],
+            )
+        if looks_like_profiling(q):
+            return self._abstain(
+                req, intent, t0,
+                "no señalo personas como sospechosas o culpables ni armo listas de supuestos delincuentes "
+                "(privacidad y reputación). Puedo mostrar qué acusaciones se publicaron, atribuidas a quien las hizo.",
+                ["Consulta de perfilamiento de personas: rechazada por política de privacidad."],
+                missing=["Una pregunta sobre un hecho o tema, no sobre la culpabilidad de personas."],
+            )
         scope = None
         if req.topic_id:
             scope = self.bases.get(req.topic_id)
@@ -171,9 +244,15 @@ class QueryEngine:
             relevance=h.relevance,
         )
 
+    def _when(self, hit):  # noqa: ANN001, ANN202
+        a = self.corpus.articles[hit.doc.doc_id]
+        return a.published_at or a.detected_at
+
     def _unknown_entities(self, question: str, scope: TopicBase | None) -> list[str]:
         """Términos de la pregunta que no son indicador, país, año ni palabra genérica (p. ej. «Marte»)."""
-        known: set[str] = set(_GENERIC_ECON)
+        known: set[str] = set(_GENERIC_ECON) | _QUERY_WORDS
+        for w in _GENERIC_ECON | _QUERY_WORDS:
+            known.update(tokenize(w))
         for kws in list(INDICATOR_KEYWORDS.values()) + list(COUNTRY_KEYWORDS.values()):
             for kw in kws:
                 known.update(tokenize(kw))
@@ -381,6 +460,22 @@ class QueryEngine:
                 hits=hit_models, coverage=coverage, matched=best.matched, warnings=warnings,
                 missing=["La cifra solicitada con su fuente primaria u oficial."],
             )
+
+        kind = _number_kind(fold(req.question))
+        if kind is not None and not (kind[0] == "un porcentaje" and ind_hits):
+            label, _, evidence_re, need = kind
+            with_figure = [h for h in usable if evidence_re.search(fold(self.corpus.articles[h.doc.doc_id].title))]
+            if _RE_TODAY.search(fold(req.question)):
+                recent = self.corpus.cutoff - timedelta(hours=48)
+                with_figure = [h for h in with_figure if (self._when(h) or recent) >= recent]
+            if not with_figure:
+                return self._abstain(
+                    req, QueryIntent.busqueda, t0,
+                    f"ningún titular pertinente contiene {label}"
+                    + (" publicado en las 48 horas previas al corte" if _RE_TODAY.search(fold(req.question)) else "")
+                    + "; un número cualquiera en el titular no responde la pregunta.",
+                    hits=hit_models, coverage=coverage, matched=best.matched, warnings=warnings, missing=[need],
+                )
 
         # agrupar por cluster; tomar el cluster del mejor artículo utilizable
         lines: list[str] = []

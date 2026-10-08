@@ -38,6 +38,21 @@ def looks_like_instruction(text: str | None) -> bool:
     return bool(_RE.search(_fold(text)))
 
 
+_PROFILING_RE = re.compile(
+    r"\b(qu[eé]|qui[eé]n(es)?|cu[aá]l(es)?)\b.{0,40}"
+    r"\b(sospechos\w*|culpables?|delincuentes?|criminal(es)?|corrupt[oa]s?|lavador\w*)"
+    r"|\blista\s+de\s+(sospechosos|delincuentes|corruptos|culpables|clientes\s+riesgosos)",
+    re.IGNORECASE,
+)
+
+
+def looks_like_profiling(text: str | None) -> bool:
+    """True si la consulta pide señalar personas como sospechosas o culpables (privacidad y reputación, PDF §8)."""
+    if not text:
+        return False
+    return bool(_PROFILING_RE.search(_fold(text)))
+
+
 _SECRET_RE = re.compile(r"(AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9]{20,}|GEMINI_API_KEY|-----BEGIN [A-Z ]*PRIVATE KEY-----)")
 
 

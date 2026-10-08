@@ -1,0 +1,4 @@
+# Los snapshots se verifican por SHA-256: nunca convertir saltos de línea (clones en Windows con autocrlf).
+data/** -text
+apps/api/fixtures/** -text
+eval/** -text
