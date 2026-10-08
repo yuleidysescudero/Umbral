@@ -256,3 +256,17 @@ def test_numeric_claims_es_en():
 def test_without_neighbors_falls_back_to_bm25(make_app):
     r = make_app().post("/api/v1/queries", json={"question": "calado del Canal por el lago Gatún"}).json()
     assert r["retrieval"]["method"] == "bm25+rapidfuzz"
+
+
+@needs_real
+def test_que_paso_con_un_tema_es_busqueda_no_resumen(real):
+    r = ask(real, "¿Qué pasó con la reforma eléctrica?")
+    assert r["intent"] != "resumen_periodo"
+    r = ask(real, "¿qué pasó esta semana en turismo?")
+    assert r["intent"] == "resumen_periodo"
+
+
+@needs_real
+def test_exact_match_stays_first_after_semantic_fusion(real):
+    r = ask(real, "¿Qué pasó con la reforma eléctrica?")
+    assert r["citations"][0]["evidenceId"] == "art_2dcbf84e2b74a8b4", r["answer"][:400]

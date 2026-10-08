@@ -67,7 +67,7 @@ R/I/U/N/E es una barra apilada con «Ver cómo se calculó».
 | 3.11 Etiquetas contaminables | El Jurado no ve «Etiquetar»; cada etiqueta guarda rol y sesión; el importador acepta solo una lista blanca (`--etiquetadores`) e informa los descartes; migración RLS `supabase/etiquetas_integridad.sql` (solo inserción, Jurado bloqueado, límites de tamaño) | `test_el_jurado_no_ve_etiquetar` |
 | 3.12 README | Badges y `git clone` apuntan a `yuleidysescudero/Umbral` (rama `mega`) y la demo está en la primera línea | — |
 
-Verificación: API 320 pruebas (incluye 34 nuevas en `apps/api/tests/test_qa_tvn.py`, sobre el snapshot real), web 73
+Verificación: API 322 pruebas (incluye 36 nuevas en `apps/api/tests/test_qa_tvn.py`, sobre el snapshot real), web 73
 pruebas (incluye el mapeo estado → expresión de Mini IA), E2E nuevas `tests/e2e/test_tvn_identidad.py` (temas #1 y #2
 visibles a 1280×720, navegación sin solapes a 1024–1440 px, **axe-core sin violaciones serious/critical** en claro y
 oscuro, estados de Mini IA para respondida/abstención/inyección, reducir movimiento). Benchmark de desarrollo (50

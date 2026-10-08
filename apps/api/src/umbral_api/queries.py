@@ -130,9 +130,10 @@ _RE_GUILT_STRIP = re.compile(r"(?i)\bes (verdad|cierto|falso) que\b|\b(es|son|fu
 # Listas de personas («quiénes son los culpables», «lista de sospechosos») siguen siendo perfilamiento: se rechazan.
 _RE_LIST_PROFILING = re.compile(r"\blista\b|\bquienes\b|\bque (personas|politicos|funcionarios)\b|\bcuales\b")
 _RE_SUMMARY = re.compile(
-    r"\bresum\w*|\bpanorama\b|\bnovedades\b|\bque (ha )?paso\b|\blo mas (importante|destacado)\b|"
-    r"\bprincipales (noticias|temas)\b|\bque hay de\b|\bcuentame\b|\bmuestrame\b"
+    r"\bresum\w*|\bpanorama\b|\bnovedades\b|\blo mas (importante|destacado)\b|\bprincipales (noticias|temas)\b"
 )
+# «¿Qué pasó con la reforma eléctrica?» es una búsqueda; solo con un periodo («qué pasó esta semana en turismo») es resumen.
+_RE_SUMMARY_WITH_PERIOD = re.compile(r"\bque (ha )?paso\b|\bque hay de\b|\bcuentame\b|\bmuestrame\b")
 _CATEGORY_WORDS: list[tuple[str, str]] = [
     (r"\becono\w*|\bfinanz\w*|\bempleo\b|\bprecios\b", "economia"),
     (r"\bcanal\b|\blogistic\w*|\bpuertos?\b|\btransitos?\b|\bnaviera\w*", "logistica_canal"),
@@ -166,7 +167,8 @@ def _category(f: str) -> str | None:
 
 def _detect_intent(q: str) -> QueryIntent:
     f = fold(q)
-    if _RE_SUMMARY.search(f) and (_category(f) or _period(f)) and not _RE_ASKS_QUANTITY.search(f):
+    summary = (_RE_SUMMARY.search(f) and (_category(f) or _period(f))) or (_RE_SUMMARY_WITH_PERIOD.search(f) and _period(f))
+    if summary and not _RE_ASKS_QUANTITY.search(f):
         return QueryIntent.resumen_periodo
     if _RE_VERIF.search(f):
         return QueryIntent.verificaciones
@@ -372,7 +374,11 @@ class QueryEngine:
             return hits, False
         sem_score: dict[str, float] = {}
         source: dict[str, Hit] = {}
-        for h in [h for h in hits if h.doc.kind == "articulo"][:5]:
+        # Solo se expanden los mejores resultados léxicos: los vecinos de una coincidencia débil («reforma» sola) no
+        # deben desplazar a la coincidencia exacta («reforma eléctrica»).
+        top_cov = max(h.coverage for h in hits)
+        strong = [h for h in hits if h.doc.kind == "articulo" and h.coverage >= top_cov - 1e-9][:3]
+        for h in strong:
             for nid, sim in nb.get(h.doc.doc_id, []):
                 if restrict is not None and nid not in restrict:
                     continue
@@ -392,7 +398,8 @@ class QueryEngine:
                 by_id[nid] = Hit(old.doc, old.bm25, max(old.fuzzy, sem_score[nid]), old.relevance, list(src.matched), src.coverage)
             elif nid not in by_id and nid in self._doc_by_id:
                 by_id[nid] = Hit(self._doc_by_id[nid], 0.0, round(sem_score[nid], 4), src.relevance, list(src.matched), src.coverage)
-        fused = sorted(by_id.values(), key=lambda h: (-rrf.get(h.doc.doc_id, 0.0), h.doc.doc_id))
+        strong_ids = {h.doc.doc_id for h in strong}
+        fused = sorted(by_id.values(), key=lambda h: (h.doc.doc_id not in strong_ids, -rrf.get(h.doc.doc_id, 0.0), h.doc.doc_id))
         return fused[: max(len(hits), 8)], True
 
     def _as_written(self, question: str, toks) -> list[str]:  # noqa: ANN001
