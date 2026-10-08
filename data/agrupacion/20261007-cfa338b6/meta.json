@@ -1,0 +1,152 @@
+{
+ "schemaVersion": 1,
+ "snapshotId": "20261007-cfa338b6",
+ "generatedAt": "2026-10-08T03:14:07+00:00",
+ "method": "semantic_embedding",
+ "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+ "threshold": 0.74,
+ "highThreshold": 0.84,
+ "lexicalAnchor": 2,
+ "windowHours": 72,
+ "text": "titular sin la entidad «Panamá»",
+ "clustersSha256": "8755f84af25dd6e2dc67cb00112322c9f3c5420e32a99124daecc87aceb1e04a",
+ "sourceClustersSha256": "757391ce17032e900499418b71d4f96792a07bf6eb1cf8a2408ce11e67baf06f",
+ "counts": {
+  "articles": 991,
+  "clustersBefore": 910,
+  "clustersAfter": 808,
+  "semanticLinks": 102,
+  "multiArticleBefore": 36,
+  "multiArticleAfter": 87,
+  "independent2PlusBefore": 7,
+  "independent2PlusAfter": 50
+ },
+ "sampleLinks": [
+  {
+   "a": "Quiénes son las estrellas del deporte que competirán en los Juegos Suramericanos Santa Fe 2026",
+   "b": "Se empieza a vivir la fiesta de los Juegos Suramericanos Santa Fe 2026",
+   "score": 0.7406
+  },
+  {
+   "a": "Camilo Pérez recibe la Orden al Mérito Deportivo Suramericano por su legado al frente de ODESUR",
+   "b": "Diario HOY | Camilo Pérez , nombrado Presidente Honorario y condecorado por su legado en ODESUR",
+   "score": 0.7409
+  },
+  {
+   "a": "Panama Canal Increases Daily Transits to 33 and Maximum Draft to 49 Feet .",
+   "b": "Panama Canal adds daily transit slot , raises Neopanamax draft limit",
+   "score": 0.7418
+  },
+  {
+   "a": "Panama Canal to Increase Daily Ship Transits as Rainfall Eases Water Shortage",
+   "b": "Panama Canal announces increase in draft and daily transit | Hellenic Shipping News Worldwide",
+   "score": 0.7418
+  },
+  {
+   "a": "Otro país sudamericano se adhiere al Escudo de las Américas : qué se sabe",
+   "b": "Escudo de la Américas",
+   "score": 0.7421
+  },
+  {
+   "a": "Embargan inmuebles de Óscar Iván Zuluaga avaluados en 3 . 664 millones de pesos",
+   "b": "Embargan tres inmuebles de excandidato presidencial Óscar Iván Zuluaga por presunta financiación de Odebrecht",
+   "score": 0.7448
+  },
+  {
+   "a": "La guía definitiva de los Juegos Suramericanos que arrancan hoy , para no perderte ningún detalle",
+   "b": "Juegos Suramericanos : comenzó la ceremonia de apertura",
+   "score": 0.7452
+  },
+  {
+   "a": "Panamá y Ecuador perdieron las semifinales de la Copa Kirin",
+   "b": "Ecuador busca redención ante Panamá : tercer amistoso en la Copa Kirin .",
+   "score": 0.7464
+  },
+  {
+   "a": "¡Emotivo! Lionel Messi tiene una despedida triunfal de la selección de Argentina",
+   "b": "Lionel Messi despedida| Argentina vs Benín: estadísticas del primer tiempo",
+   "score": 0.7478
+  },
+  {
+   "a": "Detienen en Panamá a tres dominicanos acusados de reclutar personas para guerra en Ucrania",
+   "b": "El caso de tres dominicanos acusados de trata en Panamá",
+   "score": 0.748
+  },
+  {
+   "a": "Grupos sociales denuncian una red de espionaje ; la Policía confirma que united states agentes encubierto , más no infiltrados",
+   "b": "Panamá : Alianza Ciudadana expresa preocupación por red de espionaje estatal a organizaciones sociales",
+   "score": 0.7486
+  },
+  {
+   "a": "Guatemala quiere terminar con el dominio de Jamaica en Kingston por la Liga de Naciones de Concacaf",
+   "b": "Guatemala a dura prueba frente a El Salvador en Liga de Concacaf",
+   "score": 0.7486
+  },
+  {
+   "a": "Rusia , regresen a nuestros hombres : familiares de dominicanos que combaten por Moscú se manifiestan",
+   "b": "Ellos no son soldados , familiares de dominicanos llevados a la guerra en Rusia claman por su regreso",
+   "score": 0.7496
+  },
+  {
+   "a": "Golpe a una red que lavaba las ganancias del narco en villas de lujo de Ibiza y Marbella",
+   "b": "Cae una organización que introducía cocaína en Europa y blanqueaba en villas de Ibiza , Marbella y Madrid",
+   "score": 0.75
+  },
+  {
+   "a": "Super El Niño : Fears for six - figure death toll , droughts around the world",
+   "b": "World Insights : Intensifying El Nino deepens economic risks across LatAm",
+   "score": 0.7503
+  },
+  {
+   "a": "Fredy Toc encabeza el histórico 1 - 2 - 3 de Guatemala en el Tour de Panamá",
+   "b": "Fredy Toc domina el Alto de La Vigía y asume el liderato del Tour de Panamá 2026",
+   "score": 0.7508
+  },
+  {
+   "a": "66 - 76 : Una España para enmarcar se queda sin final del Mundial",
+   "b": "Mundial de baloncesto : EE . UU . vence a España y jugará la final",
+   "score": 0.7519
+  },
+  {
+   "a": "0 - 0 ( 5 - 4 ): Japón elimina a la Ecuador de Gallardo",
+   "b": "La Ecuador de Marcelo Gallardo no convence , no pudo ante Japón",
+   "score": 0.7526
+  },
+  {
+   "a": "Protestan en Venezuela para exigir elecciones y regreso seguro de María Corina Machado | Internacional | Noticias",
+   "b": "En Maturín se movilizaron en apoyo al regreso de María Corina Machado y para exigir elecciones presidenciales",
+   "score": 0.753
+  },
+  {
+   "a": "Quiénes son las estrellas del deporte que competirán en los Juegos Suramericanos Santa Fe 2026",
+   "b": "Las estrellas que iluminarán los Juegos Suramericanos de Santa Fe",
+   "score": 0.7557
+  },
+  {
+   "a": "Quiénes son las estrellas del deporte que competirán en los Juegos Suramericanos Santa Fe 2026",
+   "b": "Santa Fe abre los Juegos Suramericanos 2026 con 60 disciplinas y 15 países",
+   "score": 0.7575
+  },
+  {
+   "a": "Localizan los cuerpos sin vida de dos personas desaparecidas en el Can Macho de Monte",
+   "b": "Localizan los cuerpos de dos rescatistas tras emergencia en el Can de Macho de Monte en Chiriqu",
+   "score": 0.759
+  },
+  {
+   "a": "Ecuador cayó por penales ante Japón y Marcelo Gallardo sigue sin ganar",
+   "b": "Ecuador pierde en los penaltis ante Japón y se medirá a Panamá",
+   "score": 0.7622
+  },
+  {
+   "a": "Se empieza a vivir la fiesta de los Juegos Suramericanos Santa Fe 2026",
+   "b": "Juegos Suramericanos : comenzó la ceremonia de apertura",
+   "score": 0.7627
+  },
+  {
+   "a": "Otro país sudamericano se adhiere al Escudo de las Américas : qué se sabe",
+   "b": "Escudo de las Américas y La Subordinocracia Latinoamericana",
+   "score": 0.7628
+  }
+ ],
+ "limits": "Solo titulares; el umbral se ajustó revisando uniones de borde y debe validarse con pares etiquetados por personas."
+}

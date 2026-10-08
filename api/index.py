@@ -16,6 +16,7 @@ os.environ.setdefault("UMBRAL_SNAPSHOT_DIR", str(RAIZ / "data" / "snapshots" / a
 os.environ.setdefault("UMBRAL_AUTH_MODE", "public")
 os.environ.setdefault("UMBRAL_PERSISTENCE", "none")
 os.environ.setdefault("UMBRAL_LOCAL_MODE", "0")
+os.environ.setdefault("UMBRAL_SEMANTIC_CLUSTERS", "1")  # grupos semánticos de data/agrupacion (si los hashes cuadran)
 os.environ.setdefault("UMBRAL_QUERIES_PER_MINUTE", "120")
 os.environ.setdefault("UMBRAL_WEB_DIST", "/tmp/sin-dist")
 

@@ -6,7 +6,7 @@
   "outputDirectory": "apps/web/dist",
   "functions": {
     "api/index.py": {
-      "includeFiles": "{apps/api/src/**,data/snapshots/CURRENT,data/snapshots/20261007-cfa338b6/**}",
+      "includeFiles": "{apps/api/src/**,data/snapshots/CURRENT,data/snapshots/20261007-cfa338b6/**,data/agrupacion/20261007-cfa338b6/**}",
       "maxDuration": 60
     }
   },

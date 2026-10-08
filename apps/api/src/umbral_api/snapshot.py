@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -232,6 +233,32 @@ def _find_metrics(path: Path, snapshot_id: str) -> dict[str, Any] | None:
     return None
 
 
+def _semantic_clusters(path: Path, manifest: dict[str, Any], clusters_raw: list[dict[str, Any]],
+                       article_ids: set[str]) -> list[dict[str, Any]] | None:
+    """Grupos semánticos precalculados (scripts/agrupar_semantico.py), solo con UMBRAL_SEMANTIC_CLUSTERS=1.
+
+    Se usan únicamente si fueron calculados sobre ESTE clusters.jsonl (SHA-256), su propio hash coincide y cada
+    artículo queda en exactamente un grupo; si algo no cuadra se ignoran y se sirven los grupos del snapshot."""
+    if os.environ.get("UMBRAL_SEMANTIC_CLUSTERS", "").strip() != "1":
+        return None
+    folder = path.parent.parent / "agrupacion" / str(manifest.get("snapshotId") or path.name)
+    meta_path, data_path = folder / "meta.json", folder / "clusters.semantic.jsonl"
+    if not meta_path.exists() or not data_path.exists():
+        return None
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    raw = data_path.read_bytes()
+    source = (path / "clusters.jsonl").read_bytes()
+    if hashlib.sha256(raw).hexdigest() != meta.get("clustersSha256") or hashlib.sha256(source).hexdigest() != meta.get("sourceClustersSha256"):
+        return None
+    rows = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()]
+    members = [m for r in rows for m in r.get("memberArticleIds", [])]
+    if set(members) != article_ids or len(members) != len(article_ids) or len({r["clusterId"] for r in rows}) != len(rows):
+        return None
+    if len(members) != sum(len(c.get("memberArticleIds", [])) for c in clusters_raw):
+        return None
+    return rows
+
+
 def load_corpus(settings: Settings) -> Corpus:
     path = resolve_snapshot_dir(settings)
     manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
@@ -266,6 +293,12 @@ def load_corpus(settings: Settings) -> Corpus:
         raise RuntimeError("Integridad del snapshot inválida: " + "; ".join(integrity.errors))
     if integrity.errors:
         notes.append("La verificación de integridad del snapshot reportó errores; los datos se sirven marcados como no verificados.")
+
+    semantic = _semantic_clusters(path, manifest, clusters_raw, {row["articleId"] for row in articles_raw})
+    if semantic is not None:
+        clusters_raw = semantic
+        notes.append("Agrupación semántica de eventos activa (data/agrupacion): paráfrasis y versiones en otro idioma "
+                     "del mismo hecho se agrupan; ver meta.json para el modelo, el umbral y una muestra de uniones.")
 
     cutoff = parse_dt(manifest.get("cutoffUtc")) or datetime.now(UTC)
     preds = {p["articleId"]: p for p in preds_raw}
