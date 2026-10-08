@@ -200,3 +200,44 @@ def test_guion_sigue_en_rango_y_valido(real):
         if any(i.code == "guion_fuera_de_rango" for i in report.issues):
             bad.append(b.id)
     assert not bad, bad[:5]
+
+
+# ---------------------------------------------------------------- 4. empates del ranking (scoring-v2)
+@pytest.fixture(scope="module")
+def v2(tmp_path_factory):
+    old = os.environ.get("UMBRAL_SCORING")
+    os.environ["UMBRAL_SCORING"] = "v2"
+    os.environ["UMBRAL_SEMANTIC_CLUSTERS"] = "1"
+    settings = make_settings(REAL, tmp_path_factory.mktemp("v2"))
+    svc = Services(settings)
+    client = TestClient(create_app(settings, services=svc), headers={"X-Umbral-User": "jurado"})
+    client.svc = svc  # type: ignore[attr-defined]
+    yield client
+    if old is None:
+        os.environ.pop("UMBRAL_SCORING", None)
+    else:
+        os.environ["UMBRAL_SCORING"] = old
+
+
+def test_agenda_por_defecto_sin_empates_masivos(v2):
+    import collections
+
+    for params in ({"limit": 100}, {"limit": 100, "scope": "all"}):
+        items = v2.get("/api/v1/topics", params=params).json()["items"]
+        assert len(items) == 100
+        # Mismo criterio que test_qa_tvn._ties: el puntaje exacto (54,55 era el empate de 51 temas en la agenda por defecto).
+        worst = collections.Counter(t["score"] for t in items).most_common(1)[0]
+        assert worst[1] <= 10, (params, worst)
+        # Con un decimal en pantalla, los temas detectados en la misma tanda de horas siguen juntos; se acota igual.
+        shown = collections.Counter(t["scoreDisplay"] for t in items).most_common(1)[0]
+        assert shown[1] <= 15, (params, shown)
+
+
+def test_u_usa_deteccion_y_lo_dice(v2):
+    items = v2.get("/api/v1/topics", params={"limit": 100}).json()["items"]
+    sin_fecha = [t for t in items if not t["firstPublishedAt"]]
+    assert sin_fecha
+    for t in sin_fecha[:10]:
+        u = next(c for c in t["scoreComponents"] if c["key"] == "U")
+        assert u["value"] > 0, t["id"]
+        assert "detección" in u["justification"], u["justification"]

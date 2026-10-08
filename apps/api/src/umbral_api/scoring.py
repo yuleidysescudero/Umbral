@@ -45,7 +45,9 @@ RULE_TEXT = {
 BANDS = {"bajo": "[0, 40)", "medio": "[40, 70)", "alto": "[70, 100]"}
 RULE_TEXT_V2 = {
     **RULE_TEXT,
-    "U": "Continua: max(0, 1 − horas desde la publicación / 168). Sin fecha de publicación se usa la de detección y se indica.",
+    "U": "Continua: max(1 − h/168, 0,25 × (1 − h/720), 0), con h = horas desde la publicación. La primera semana manda la "
+         "caída lineal; después, una cola suave hasta 30 días que ordena temas viejos sin igualarlos a 0. Sin fecha de "
+         "publicación se usa la de detección y se indica.",
     "E": "Como v1 (0 / 0,33 / 0,67 / 1) y +0,1 si alguna procedencia es TVN o una fuente oficial .gob.pa (máximo 1).",
 }
 CHANGELOG = [
@@ -61,9 +63,14 @@ CHANGELOG = [
         "reason": "Misma fórmula y pesos; cambia solo la normalización (el reto pide justificar cambios de criterios). "
         "En v1, U escalonada (1/0,5/0) e I por defecto 0,25 dejaban 72 de los 100 primeros temas empatados en 54,55 "
         "(35 con la agrupación semántica); con v2 el puntaje más repetido aparece 10 veces. "
-        "U pasa a ser continua en 168 h y E suma 0,1 por procedencia TVN u oficial .gob.pa. v1 sigue disponible.",
+        "U pasa a ser continua en 168 h y E suma 0,1 por procedencia TVN u oficial .gob.pa. v1 sigue disponible. "
+        "Ajuste del mismo día (revisión final): en la agenda por defecto 51 de los 100 primeros seguían en 54,6 porque "
+        "tenían entre 9 y 26 días (U = 0 pasada la semana); U suma una cola 0,25 × (1 − h/720) y el máximo baja a ≤10.",
     },
 ]
+
+# U v2: caída lineal en una semana y cola suave hasta 30 días (temas viejos ordenados, no todos en 0).
+U_WEEK_H, U_TAIL_H, U_TAIL = 168, 720, Fraction(1, 4)
 
 _R = {GeoRelevance.panama: Fraction(1), GeoRelevance.regional: Fraction(1, 2)}
 _I = {ImpactLevel.bajo: Fraction(1, 4), ImpactLevel.medio: Fraction(1, 2), ImpactLevel.alto: Fraction(1)}
@@ -154,8 +161,12 @@ def urgency_value_v2(first_published: datetime | None, first_detected: datetime 
     if seconds < 0:
         limits.append("La fecha es posterior al corte del snapshot; se ignora.")
         return Fraction(0), "Fecha posterior al corte: 0.", limits
-    value = max(Fraction(0), 1 - Fraction(seconds, 168 * 3600))
-    return value, f"Hace {seconds / 3600:.1f} h desde la {basis} respecto al corte: 1 − h/168 = {float(value):.2f}.", limits
+    week = 1 - Fraction(seconds, U_WEEK_H * 3600)
+    tail = U_TAIL * (1 - Fraction(seconds, U_TAIL_H * 3600))
+    value = max(Fraction(0), week, tail)
+    formula = "1 − h/168" if week >= tail else "cola 0,25 × (1 − h/720)"
+    note = " (sin fecha de publicación: se usó la de detección)" if basis == "detección" else ""
+    return value, f"Hace {seconds / 3600:.1f} h desde la {basis} respecto al corte{note}: {formula} = {float(value):.3f}.", limits
 
 
 def evidence_value(inp: ScoreInputs) -> tuple[Fraction, str, list[str]]:
