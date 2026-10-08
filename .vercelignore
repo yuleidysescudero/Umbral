@@ -1,0 +1,7 @@
+**/node_modules
+**/.venv
+apps/web/dist
+apps/desktop
+eval/verification
+**/__pycache__
+.umbral-local

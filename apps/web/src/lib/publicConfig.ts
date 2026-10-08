@@ -13,8 +13,12 @@ export function validatePublicApiUrl(value: string, browserHost: string): string
   return url.origin;
 }
 
+/** `same-origin`: la API vive en el mismo dominio que la web (despliegue en Vercel con función Python). */
+export const SAME_ORIGIN = 'same-origin';
+
 export async function resolvePublicApiUrl(signal?: AbortSignal): Promise<string> {
   const host = window.location.hostname;
+  if (config.apiUrl === SAME_ORIGIN) return '';
   if (config.apiUrl) return validatePublicApiUrl(config.apiUrl, host);
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 6000);
   const cancel = () => controller.abort();

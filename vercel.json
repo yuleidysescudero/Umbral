@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "cd apps/web && npx --yes pnpm@10.33.0 install --frozen-lockfile",
+  "buildCommand": "cd apps/web && PUBLIC_API_URL=same-origin PUBLIC_API_MODE=live PUBLIC_AUTH_MODE=public npx --yes pnpm@10.33.0 build",
+  "outputDirectory": "apps/web/dist",
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "{apps/api/src/**,data/snapshots/CURRENT,data/snapshots/20261007-cfa338b6/**}",
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index"
+    }
+  ]
+}
