@@ -130,14 +130,14 @@ describe('agenda', () => {
   it('anima el encabezado al abrir y las tarjetas al llegar los datos; buscar no repite la animación', async () => {
     mount(<Agenda />);
     await screen.findAllByTestId('topic-card');
-    const heading = calls.filter((c) => c.el.classList.contains('comic-page-heading'));
+    const heading = calls.filter((c) => c.el.getAttribute('data-motion') === 'heading');
     const cards = calls.filter((c) => c.el.getAttribute('data-testid') === 'topic-card');
     expect(heading).toHaveLength(1);
     expect(cards.length).toBeGreaterThan(0);
     fireEvent.change(screen.getByTestId('agenda-search'), { target: { value: 'canal' } });
     await waitFor(() => expect(screen.getByTestId('agenda-count')).toBeTruthy());
     await new Promise((r) => setTimeout(r, 400));
-    expect(calls.filter((c) => c.el.getAttribute('data-testid') === 'topic-card' || c.el.classList.contains('comic-page-heading'))).toHaveLength(
+    expect(calls.filter((c) => c.el.getAttribute('data-testid') === 'topic-card' || c.el.getAttribute('data-motion') === 'heading')).toHaveLength(
       heading.length + cards.length,
     );
   });

@@ -19,6 +19,8 @@ export type Session = {
   token?: string;
   userId?: string;
   expira?: number;
+  /** Identificador aleatorio de esta entrada: cada etiqueta lo guarda para poder auditar y descartar sesiones. */
+  sesionId?: string;
 };
 
 const env = import.meta.env;
@@ -63,9 +65,15 @@ async function loginDemo(rol: Rol): Promise<Pick<Session, 'token' | 'userId' | '
   }
 }
 
+/** El Jurado recorre y evalúa, pero no etiqueta: sus etiquetas contaminarían las métricas humanas. */
+export function puedeEtiquetar(s: Session | null): boolean {
+  return Boolean(s) && s!.rol !== 'jurado';
+}
+
 export async function entrar(rol: Rol): Promise<Session> {
   const remoto = await loginDemo(rol);
-  const s: Session = { rol, nombre: ROLES[rol].firma, modo: remoto ? 'compartido' : 'local', ...(remoto ?? {}) };
+  const sesionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const s: Session = { rol, nombre: ROLES[rol].firma, modo: remoto ? 'compartido' : 'local', sesionId, ...(remoto ?? {}) };
   guardarSesion(s);
   return s;
 }

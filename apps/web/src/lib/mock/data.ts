@@ -1,6 +1,7 @@
 // DATOS DE DEMOSTRACIÓN DEL FRONTEND. NO son noticias ni cifras reales.
 // Se usan solo cuando la API no responde (PUBLIC_API_MODE=mock|auto) y la interfaz lo declara con un banner.
 // Para reemplazarlos: ponga PUBLIC_API_MODE=live; esta carpeta no se importa en ese modo salvo por carga dinámica.
+import { fmtScore } from '../format';
 import type {
   Category,
   Claim,
@@ -199,8 +200,8 @@ const SPECS: Spec[] = [
         status: 'pendiente_de_revision',
         pendingVerification: 'Contrastar con estadística oficial del período.',
         versions: [
-          { evidenceId: 'mock-c1', outlet: 'Medio de ejemplo E', publishedAt: '2026-10-05T14:00:00Z', scope: 'titular', statement: 'La llegada subió.' },
-          { evidenceId: 'mock-c2', outlet: 'Medio de ejemplo F', publishedAt: '2026-10-06T09:00:00Z', scope: 'titular', statement: 'La llegada bajó.' },
+          { evidenceId: 'mock-c1', outlet: 'Medio de ejemplo E', publishedAt: '2026-10-05T14:00:00Z', detectedAt: null, scope: 'titular', statement: 'La llegada subió.' },
+          { evidenceId: 'mock-c2', outlet: 'Medio de ejemplo F', publishedAt: '2026-10-06T09:00:00Z', detectedAt: null, scope: 'titular', statement: 'La llegada bajó.' },
         ],
       },
     ],
@@ -290,6 +291,7 @@ export function buildScore(spec: Spec): ScoreDetail {
   const total = Math.round(components.reduce((a, c) => a + c.points, 0) * 10) / 10;
   return {
     band: bandOf(total),
+    display: fmtScore(total),
     components,
     disclaimer: 'El puntaje ordena la atención; no es una probabilidad de verdad ni habilita publicación.',
     formula: 'P = 30R + 25I + 20U + 15N + 10E',
@@ -315,6 +317,8 @@ export function buildDetail(spec: Spec, caseView: TopicDetail['case']): TopicDet
       category: spec.category,
       categoryLabel: spec.categoryLabel,
       score: score.total,
+      scoreDisplay: score.display,
+      titleLanguage: 'es',
       band: score.band,
       scoreComponents: score.components,
       evidenceStatus: spec.evidence,

@@ -214,7 +214,7 @@ export function Button({
   busy?: boolean;
 } & React.ButtonHTMLAttributes<HTMLButtonElement> & { 'data-testid'?: string }) {
   const styles = {
-    primary: 'bg-ink text-white border-ink hover:bg-amber-700 hover:border-amber-700',
+    primary: 'btn-tvn',
     secondary: 'bg-card text-ink border-rule-strong hover:bg-amber-50 hover:border-amber-600',
     ghost: 'bg-transparent text-ink-2 border-transparent hover:bg-sunk',
     danger: 'bg-card text-bad border-bad/50 hover:bg-bad-bg',

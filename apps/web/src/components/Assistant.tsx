@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Bot, CircleSlash, ExternalLink, GitCompare, Send, TriangleAlert, X } from 'lucide-react';
+import { CircleSlash, ExternalLink, GitCompare, Send, ShieldAlert, TriangleAlert, X } from 'lucide-react';
 import type { AnswerStatus, QueryResponse } from '../lib/api/types';
 import { ANSWER_LABEL } from '../lib/labels';
 import { fmtDateTime } from '../lib/format';
@@ -10,6 +10,12 @@ import { useApp } from './context';
 import { Button, Notice, Pill, inputCls, type Tone } from './ui';
 import { Checkbox } from './ui/controls';
 import { RichText } from './ui/RichText';
+import { MiniIA } from './mascot/MiniIA';
+import { MASCOT_LINE, mascotStateFor, type MascotState } from '../lib/mascot';
+
+const WARNING_TEXT: Record<string, string> = {
+  inyeccion_detectada: 'Se detectó un intento de dar órdenes al sistema (inyección): ese fragmento se rechazó y no se ejecutó.',
+};
 
 const STATUS_TONE: Record<AnswerStatus, Tone> = {
   respondida: 'ok',
@@ -30,11 +36,21 @@ type Turn = { id: number; question: string; scopedTo: string | null; pending: bo
 function Answer({ r, id }: { r: QueryResponse; id: string }) {
   const { go } = useApp();
   const abst = r.answerStatus === 'abstencion';
+  const mood = mascotStateFor(r);
   return (
-    <div data-testid="assistant-answer" data-bubble-id={id} data-status={r.answerStatus} className="comic-answer space-y-2 text-sm">
-      <Pill tone={STATUS_TONE[r.answerStatus]} icon={abst ? CircleSlash : r.answerStatus === 'contradiccion' ? GitCompare : Bot}>
-        {ANSWER_LABEL[r.answerStatus]}
-      </Pill>
+    <div data-testid="assistant-answer" data-bubble-id={id} data-status={r.answerStatus} className="flex items-start gap-2">
+    <MiniIA size={40} state={mood} testId="answer-mascot" className="mt-1" />
+    <div className="comic-answer min-w-0 flex-1 space-y-2 text-sm">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Pill tone={STATUS_TONE[r.answerStatus]} icon={abst ? CircleSlash : r.answerStatus === 'contradiccion' ? GitCompare : undefined}>
+          {ANSWER_LABEL[r.answerStatus]}
+        </Pill>
+        {mood === 'bloqueo' && (
+          <Pill tone="bad" icon={ShieldAlert} testId="assistant-blocked">
+            Bloqueado por seguridad o privacidad
+          </Pill>
+        )}
+      </div>
       <RichText text={r.answer} testId="assistant-answer-text" className="text-[0.9375rem]" />
 
       {abst && (
@@ -74,7 +90,7 @@ function Answer({ r, id }: { r: QueryResponse; id: string }) {
               <ul className="mt-1 space-y-0.5">
                 {k.versions.map((v) => (
                   <li key={v.evidenceId}>
-                    «{v.statement}» <span className="text-xs text-ink-3">— {v.outlet}, {fmtDateTime(v.publishedAt)}</span>
+                    «{v.statement}» <span className="text-xs text-ink-3">— {v.outlet}, {v.publishedAt ? fmtDateTime(v.publishedAt) : v.detectedAt ? `detectado ${fmtDateTime(v.detectedAt)}` : 'sin fecha'}</span>
                   </li>
                 ))}
               </ul>
@@ -138,9 +154,9 @@ function Answer({ r, id }: { r: QueryResponse; id: string }) {
       {r.warnings.length > 0 && (
         <ul className="space-y-0.5 text-xs text-warn">
           {r.warnings.map((w) => (
-            <li key={w} className="flex gap-1">
+            <li key={w} className="flex gap-1" data-warning={w}>
               <TriangleAlert size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
-              {w}
+              {WARNING_TEXT[w] ?? w}
             </li>
           ))}
         </ul>
@@ -148,6 +164,7 @@ function Answer({ r, id }: { r: QueryResponse; id: string }) {
       <p className="text-[11px] text-ink-3">
         Recuperación: {r.retrieval.method} · cobertura de términos {Math.round(r.retrieval.coverage * 100)} % · {r.retrieval.tookMs.toFixed(0)} ms · snapshot {r.snapshotId}
       </p>
+    </div>
     </div>
   );
 }
@@ -167,6 +184,17 @@ export function Assistant({ open, modal = false, onClose, seed }: { open: boolea
   const leaving = useRef(false);
   const seenBubbles = useRef(new Set<string>());
   const currentTopic = route.view === 'ficha' || route.view === 'borradores' ? route.topicId : null;
+  const [gaze, setGaze] = useState(0);
+  const last = turns[turns.length - 1];
+  const headState: MascotState = last?.pending
+    ? 'pensando'
+    : text.trim()
+      ? 'escuchando'
+      : last?.error
+        ? 'error'
+        : last?.result
+          ? mascotStateFor(last.result)
+          : 'idle';
 
   useEffect(() => {
     if (seed.n > 0) setText(seed.text);
@@ -285,25 +313,35 @@ export function Assistant({ open, modal = false, onClose, seed }: { open: boolea
         }
       }}
     >
-      <div className="comic-dialogue-header flex items-center justify-between px-4 py-3">
-        <div>
-          <p className="kicker">Asistente integrado</p>
-          <h2 className="font-display text-lg font-bold leading-tight">Consulta la evidencia</h2>
+      <div className="comic-dialogue-header flex items-center justify-between gap-2 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="grid shrink-0 place-items-center rounded-full bg-white p-0.5">
+            <MiniIA size={72} state={headState} gaze={gaze} testId="assistant-mascot" />
+          </span>
+          <div className="min-w-0">
+            <p className="kicker">Mini IA · asistente</p>
+            <h2 className="font-display text-lg leading-tight">Consulta la evidencia</h2>
+            <p className="text-xs text-[#D9D6F2]" aria-live="polite" data-testid="assistant-mood">{MASCOT_LINE[headState]}</p>
+          </div>
         </div>
         <Button variant="ghost" onClick={onClose} aria-label="Cerrar asistente" data-testid="assistant-close" icon={X} />
       </div>
 
       <div ref={logRef} className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
         {turns.length === 0 && (
-          <div className="space-y-2 text-sm text-ink-2">
-            <p>Pregunta en español. Cada respuesta enlaza las fuentes usadas; si no hay evidencia, se abstiene y dice qué falta.</p>
-            <ul className="space-y-1.5">
+          <div className="space-y-3 text-sm text-ink-2" data-testid="assistant-empty">
+            <div className="flex flex-col items-center gap-2 pt-2 text-center">
+              <MiniIA size={112} state={text.trim() ? 'escuchando' : 'idle'} gaze={gaze} />
+              <p className="mascot-bubble">Pregúntame por la agenda. Si no tengo evidencia, te lo digo.</p>
+            </div>
+            <p className="text-xs">Cada respuesta enlaza sus fuentes; si no hay evidencia, me abstengo y te digo qué falta.</p>
+            <ul className="flex flex-wrap gap-2">
               {SUGGESTIONS.map((s) => (
                 <li key={s}>
                   <button
                     type="button"
                     data-testid="assistant-suggestion"
-                    className="min-h-11 w-full rounded-md border border-rule-strong bg-card px-3 py-2.5 text-left text-sm hover:border-amber-600 hover:bg-amber-50"
+                    className="min-h-11 rounded-full border-2 border-ink bg-card px-3.5 py-2 text-left text-sm font-semibold text-ink hover:bg-amber-50"
                     onClick={() => submit(s)}
                   >
                     {s}
@@ -320,14 +358,18 @@ export function Assistant({ open, modal = false, onClose, seed }: { open: boolea
               {t.scopedTo && <span className="mt-0.5 block text-xs opacity-80">Limitada al tema {t.scopedTo}</span>}
             </p>
             {t.pending && (
-              <p role="status" className="text-sm text-ink-3">
-                Buscando evidencia…
+              <p role="status" className="flex items-center gap-2 text-sm text-ink-3">
+                <MiniIA size={40} state="pensando" testId="pending-mascot" />
+                Buscando evidencia en el corpus…
               </p>
             )}
             {t.error && (
-              <Notice tone="bad" role="alert" testId="assistant-error" animate={false} data-bubble-id={`e${t.id}`}>
-                {t.error}
-              </Notice>
+              <div className="flex items-start gap-2">
+                <MiniIA size={40} state="error" testId="error-mascot" className="mt-1" />
+                <Notice tone="bad" role="alert" testId="assistant-error" animate={false} data-bubble-id={`e${t.id}`}>
+                  {t.error}
+                </Notice>
+              </div>
             )}
             {t.result && <Answer r={t.result} id={`a${t.id}`} />}
           </div>
@@ -357,7 +399,13 @@ export function Assistant({ open, modal = false, onClose, seed }: { open: boolea
           rows={2}
           value={text}
           maxLength={600}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            // La mirada sigue al cursor: posición aproximada dentro de la línea visible del campo.
+            const caret = e.target.selectionStart ?? e.target.value.length;
+            const cols = Math.max(20, Math.floor(e.target.clientWidth / 8));
+            setGaze(((caret % cols) / cols) * 2 - 1);
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();

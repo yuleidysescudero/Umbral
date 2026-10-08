@@ -15,7 +15,7 @@ import {
 import type { Claim, Contradiction, EvidenceArticle, IndicatorPoint, TopicDetail } from '../../lib/api/types';
 import { useSetImpact, useTopic, useTopics } from '../../lib/hooks';
 import { CATEGORY_LABEL, CLAIM_HELP, CLAIM_LABEL } from '../../lib/labels';
-import { fmtDateTime, fmtNumber, fmtScore } from '../../lib/format';
+import { fmtDateTime, fmtNumber, fmtScore, scoreText } from '../../lib/format';
 import { ApiError, describeError } from '../../lib/api/client';
 import { useEntrance } from '../../lib/useMotion';
 import { useApp } from '../context';
@@ -410,7 +410,7 @@ function FichaBody({ d }: { d: TopicDetail }) {
           aside={
             <p className="flex items-baseline gap-1">
               <span className="font-display text-4xl font-bold tabular-nums" data-testid="ficha-score">
-                {fmtScore(d.score.total)}
+                {d.score.display || fmtScore(d.score.total)}
               </span>
               <span className="text-xs text-ink-3">/ 100</span>
             </p>
@@ -567,7 +567,7 @@ function Picker(): ReactNode {
           <li key={t.id} data-motion="card">
             <button type="button" className="w-full rounded-md border border-rule bg-card p-3 text-left hover:border-amber-600" onClick={() => go({ view: 'ficha', topicId: t.id })}>
               <span className="font-semibold">{t.title}</span>
-              <span className="ml-2 text-sm text-ink-3">{fmtScore(t.score)} pts</span>
+              <span className="ml-2 text-sm text-ink-3">{scoreText(t)} pts</span>
             </button>
           </li>
         ))}

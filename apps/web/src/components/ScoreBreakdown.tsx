@@ -4,6 +4,28 @@ import type { ScoreComponent } from '../lib/api/types';
 import { COMPONENT_NAME } from '../lib/labels';
 import { fmtNumber } from '../lib/format';
 
+/** Barra apilada de 5 segmentos (aporte en puntos de cada componente sobre 100) con leyenda. */
+export function ScoreStack({ components }: { components: ScoreComponent[] }) {
+  const label = components.map((c) => `${COMPONENT_NAME[c.key] ?? c.label} ${fmtNumber(c.points, 1)}`).join(', ');
+  return (
+    <div className="space-y-1.5" data-testid="score-stack">
+      <div className="score-stack" role="img" aria-label={`Aporte por componente (puntos de 100): ${label}`}>
+        {components.map((c) => (
+          <span key={c.key} className={`seg-${c.key}`} style={{ width: `${Math.max(0, c.points)}%` }} />
+        ))}
+      </div>
+      <p className="score-legend" aria-hidden="true">
+        {components.map((c) => (
+          <span key={c.key}>
+            <i className={`seg-${c.key}`} />
+            {c.key} {fmtNumber(c.points, 0)}
+          </span>
+        ))}
+      </p>
+    </div>
+  );
+}
+
 /** Componentes de P = 30R + 25I + 20U + 15N + 10E con regla, justificación y límites. */
 export function ScoreBreakdown({
   components,

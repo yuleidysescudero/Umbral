@@ -16,12 +16,16 @@ const guarantees = [
 ];
 ---
 
-<Base title="Umbral · De la señal a la decisión">
+<Base title="Umbral × TVN · Agenda editorial">
   <a href="#contenido" class="skip-link">Saltar al contenido</a>
-  <header class="comic-masthead border-b-2 border-ink">
+  <header class="tvn-masthead">
     <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-      <a href="/" class="comic-brand" aria-label="Umbral, inicio">Umbral<span>.</span></a>
-      <a href="/app/" class="comic-landing-link bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700">Abrir la aplicación</a>
+      <a href="/" class="tvn-brand" aria-label="Umbral × TVN, inicio">
+        <span class="tvn-logo" role="img" aria-label="TVN" style="width:38px;height:38px;font-size:13px">TVN</span>
+        <span class="tvn-brand-divider" aria-hidden="true"></span>
+        <span><span class="tvn-brand-name">Umbral</span><span class="tvn-brand-sub">Agenda editorial</span></span>
+      </a>
+      <a href="/app/" class="comic-landing-link btn-tvn px-4 py-2 text-sm">Abrir la aplicación</a>
     </div>
   </header>
 
@@ -35,9 +39,13 @@ const guarantees = [
         Umbral convierte noticias públicas e indicadores oficiales en una agenda priorizada, fichas de evidencia con procedencia y borradores
         para revisión humana. Ayuda a encontrar qué vale la pena mirar y deja claro qué falta comprobar; no se ha medido todavía cuánto tiempo ahorra.
       </p>
+      <div class="mt-6 flex flex-wrap items-center gap-4">
+        <img src="/brand/tvn/mini-ia.png" alt="Mini IA, la mascota tecnológica de TVN" width="120" height="120" class="rounded-2xl border-2 border-white" />
+        <p class="max-w-md text-base">Mini IA te acompaña en el asistente: si no tiene evidencia, te lo dice.</p>
+      </div>
       <div class="mt-7 flex flex-wrap gap-3">
-        <a href="/app/" class="comic-landing-link bg-ink px-5 py-3 font-semibold text-white hover:bg-amber-700">Ver la agenda</a>
-        <a href="/app/#/fuentes" class="comic-landing-link bg-card px-5 py-3 font-semibold hover:bg-amber-50">Fuentes y evaluación</a>
+        <a href="/app/" class="comic-landing-link btn-tvn px-5 py-3">Ver la agenda</a>
+        <a href="/app/#/fuentes" class="comic-landing-link bg-card px-5 py-3 text-ink hover:bg-amber-50">Fuentes y evaluación</a>
       </div>
     </section>
 
@@ -47,7 +55,7 @@ const guarantees = [
         {
           steps.map((s) => (
             <li class="comic-panel p-4">
-              <span class="font-display text-3xl font-bold text-amber-600">{s.n}</span>
+              <span class="font-score text-3xl text-amber-600">{s.n}</span>
               <h3 class="mt-1 font-semibold">{s.t}</h3>
               <p class="mt-1 text-sm text-ink-2">{s.d}</p>
             </li>
@@ -83,7 +91,7 @@ const guarantees = [
 
   <footer class="border-t-2 border-ink">
     <p class="mx-auto max-w-5xl px-4 py-5 text-sm text-ink-3">
-      Prototipo del hackatón (7–9 de octubre de 2026). Licencia MIT. Los resultados son borradores y señales para revisión humana; no se publican noticias ni alertas de forma automática.
+      <strong>Prototipo de hackIAthon para TVN Media. No es un producto oficial de Televisora Nacional, S.A.</strong> Prototipo del hackatón (7–9 de octubre de 2026). Licencia MIT. Los resultados son borradores y señales para revisión humana; no se publican noticias ni alertas de forma automática.
     </p>
   </footer>
 </Base>

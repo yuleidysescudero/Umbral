@@ -3,11 +3,11 @@ import { ArrowRight, ChevronDown, FileSearch, GitCompare, Newspaper, Repeat, Sea
 import type { Category, EvidenceStatus, ReviewStatus, ScoreBand, TopicFilters, TopicSummary } from '../../lib/api/types';
 import { useRules, useTopics } from '../../lib/hooks';
 import { BAND_LABEL, CATEGORY_LABEL, EVIDENCE_LABEL, REVIEW_LABEL } from '../../lib/labels';
-import { fmtDateTime, fmtScore } from '../../lib/format';
+import { fmtDateTime, scoreText } from '../../lib/format';
 import { useDisclosureMotion, useEntrance, useRevealNew } from '../../lib/useMotion';
 import { useApp } from '../context';
 import { BandPill, Button, ErrorBox, EvidencePill, Loading, Notice, Pill, ReviewPill, inputCls } from '../ui';
-import { ScoreBreakdown } from '../ScoreBreakdown';
+import { ScoreBreakdown, ScoreStack } from '../ScoreBreakdown';
 import { Disclosure, Select, Tooltip, type SelectOption } from '../ui/controls';
 import { SESSION_GATE } from '../../lib/session';
 
@@ -76,6 +76,8 @@ export function TopicFlags({ t }: { t: TopicSummary }) {
   );
 }
 
+const LANG_NAME: Record<string, string> = { en: 'inglés', de: 'alemán', zh: 'chino', ko: 'coreano', fr: 'francés', pt: 'portugués' };
+
 /** Lenguaje de redacción: repetición no es corroboración (CU-03). */
 function fuentesReales(t: TopicSummary): string {
   const n = t.independentProvenances, m = t.articleCount;
@@ -96,15 +98,24 @@ function TopicCard({ t, onOpen }: { t: TopicSummary; onOpen: (id: string) => voi
       data-motion-id={t.id}
       className="comic-panel topic-panel"
     >
-      <div className="topic-panel-content">
+      <div data-testid={t.rank ? `topic-card-${t.rank}` : undefined} className="topic-panel-content">
         <div className="topic-rank">
           <span aria-label={`Posición ${t.rank ?? '–'}`}>
             {t.rank ?? '–'}
           </span>
         </div>
-        <div className="topic-copy space-y-2">
-          <p className="kicker">{CATEGORY_LABEL[t.category] ?? t.categoryLabel}</p>
-          <h3 className="font-display text-xl font-bold leading-snug">
+        <div className="topic-copy space-y-1.5">
+          <p className="kicker">
+            {CATEGORY_LABEL[t.category] ?? t.categoryLabel}
+            {t.titleLanguage && t.titleLanguage !== 'es' && (
+              <span className="ml-2 align-middle normal-case tracking-normal">
+                <Pill tone="info" testId="title-language" title="Ningún medio del grupo lo publicó en español. Se muestra el titular original; la cita conserva el texto exacto.">
+                  Titular en {LANG_NAME[t.titleLanguage] ?? t.titleLanguage}
+                </Pill>
+              </span>
+            )}
+          </p>
+          <h3 className="font-display leading-snug">
             <a
               href={`#/ficha/${encodeURIComponent(t.id)}`}
               className="underline-offset-4 hover:text-amber-700 hover:underline"
@@ -119,18 +130,9 @@ function TopicCard({ t, onOpen }: { t: TopicSummary; onOpen: (id: string) => voi
           </h3>
           <p className="text-sm text-ink-2">
             <span className="font-semibold text-ink">Por qué: </span>
-            {t.topReason}
+            {t.topReason}.{' '}
+            {SESSION_GATE && <span className="font-semibold text-ink" data-testid="topic-real-sources">{fuentesReales(t)}</span>}
           </p>
-          {SESSION_GATE ? (
-            <>
-              <p className="text-sm font-semibold" data-testid="topic-real-sources">{fuentesReales(t)}</p>
-              <Disclosure summary="Cómo se calculó la relevancia" className="text-xs text-ink-3" testId="topic-relevance-detail">
-                <p className="pt-1">Pertinencia geográfica: {t.relevanceReason}</p>
-              </Disclosure>
-            </>
-          ) : (
-            <p className="text-xs text-ink-3">Pertinencia geográfica: {t.relevanceReason}</p>
-          )}
           <div className="flex flex-wrap gap-1.5">
             <EvidencePill status={t.evidenceStatus} />
             <ReviewPill status={t.reviewStatus} testId="topic-review-status" />
@@ -143,29 +145,32 @@ function TopicCard({ t, onOpen }: { t: TopicSummary; onOpen: (id: string) => voi
           </p>
         </div>
         <div className="topic-score-box">
-          <div className="mb-2 flex items-baseline justify-between gap-2">
+          <div className="mb-1.5 flex items-baseline justify-between gap-2">
             <p className="flex items-baseline gap-1">
-              <Tooltip content="Puntaje de atención 0–100">
-                <span data-testid="topic-score" className="font-display text-4xl font-bold tabular-nums">
-                  {fmtScore(t.score)}
+              <Tooltip content="Puntaje de atención 0–100: ordena dónde mirar primero; no prueba verdad ni habilita publicación.">
+                <span data-testid="topic-score" className="tabular-nums">
+                  {scoreText(t)}
                 </span>
               </Tooltip>
               <span className="text-xs text-ink-3">/ 100</span>
             </p>
             <BandPill band={t.band} />
           </div>
-          <ScoreBreakdown components={t.scoreComponents} variant="compact" testIdPrefix="card-score" />
-        </div>
-      </div>
-      <div className="topic-panel-footer mt-3 flex flex-wrap items-center justify-between gap-2 pt-3">
-        <p className="text-xs text-ink-3">Ordena la atención; no prueba verdad ni habilita publicación.</p>
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-          <Button icon={FileSearch} onClick={() => onOpen(t.id)}>
-            Abrir ficha
-          </Button>
-          <Button icon={ArrowRight} onClick={() => go({ view: 'borradores', topicId: t.id })}>
-            Borradores
-          </Button>
+          <ScoreStack components={t.scoreComponents} />
+          <Disclosure summary="Ver cómo se calculó" className="text-xs" testId="card-score-detail">
+            <div className="space-y-2 pt-1">
+              <ScoreBreakdown components={t.scoreComponents} variant="compact" testIdPrefix="card-score" />
+              <p data-testid="topic-relevance-detail">Pertinencia geográfica: {t.relevanceReason}</p>
+            </div>
+          </Disclosure>
+          <div className="mt-1 grid grid-cols-2 gap-1.5">
+            <Button icon={FileSearch} onClick={() => onOpen(t.id)} className="btn-compact">
+              Ficha
+            </Button>
+            <Button icon={ArrowRight} onClick={() => go({ view: 'borradores', topicId: t.id })} className="btn-compact">
+              Borradores
+            </Button>
+          </div>
         </div>
       </div>
     </li>
@@ -209,22 +214,22 @@ export function Agenda() {
   );
 
   return (
-    <div ref={rootRef} data-testid="agenda-view" className="space-y-5">
-      <header data-motion="heading" className="comic-page-heading">
-        <p className="kicker">Agenda de Panamá · CU-01</p>
-        <h1 className="font-display text-3xl font-bold leading-tight sm:text-4xl">¿Qué cinco temas merecen revisión y por qué?</h1>
-        <p className="mt-2 max-w-3xl text-ink-2">
-          El puntaje <strong className="block whitespace-nowrap text-base sm:inline sm:whitespace-normal sm:text-inherit">{rules.data?.formula ?? 'P = 30R + 25I + 20U + 15N + 10E'}</strong> ordena dónde mirar primero. No dice qué es verdad: el estado de evidencia
-          es independiente y la decisión editorial es siempre de una persona.
-        </p>
+    <div ref={rootRef} data-testid="agenda-view" className="space-y-3">
+      <header data-motion="heading" className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b-2 border-ink pb-1.5">
+        <h1 className="font-display text-xl leading-tight sm:text-2xl">Los cinco temas que merecen revisión hoy</h1>
+        <Tooltip content="El puntaje ordena dónde mirar primero. No dice qué es verdad: el estado de evidencia es independiente y la decisión editorial es siempre de una persona.">
+          <span className="text-xs text-ink-2">
+            <strong className="font-mono">{rules.data?.formula ?? 'P = 30R + 25I + 20U + 15N + 10E'}</strong> · {rules.data?.rulesVersion ?? 'scoring-v1'}
+          </span>
+        </Tooltip>
       </header>
 
-      <form noValidate role="search" aria-label="Filtros de la agenda" className="comic-filters space-y-3 p-3" onSubmit={(e) => e.preventDefault()}>
-        <div>
-          <label htmlFor={`${uid}-q`} className="mb-1 block text-xs font-semibold text-ink-2">
+      <form noValidate role="search" aria-label="Filtros de la agenda" className="comic-filters agenda-filters space-y-3 p-2" onSubmit={(e) => e.preventDefault()}>
+        <div className="flex items-center gap-2">
+          <label htmlFor={`${uid}-q`} className="sr-only">
             Buscar en los temas
           </label>
-          <div className="relative">
+          <div className="relative min-w-0 flex-1">
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" aria-hidden="true" />
             <input
               id={`${uid}-q`}
@@ -244,10 +249,9 @@ export function Agenda() {
               </button>
             )}
           </div>
-        </div>
 
         <Button
-          className="w-full justify-between min-[480px]:hidden"
+          className="shrink-0 justify-between"
           aria-expanded={filtersOpen}
           aria-controls={`${uid}-filters`}
           onClick={() => setFiltersOpen(!filtersOpen)}
@@ -259,8 +263,9 @@ export function Agenda() {
           </span>
           <ChevronDown size={16} aria-hidden="true" className={`comic-chevron ${filtersOpen ? 'rotate-180' : ''}`} />
         </Button>
+        </div>
 
-        <div id={`${uid}-filters`} ref={filtersRef} className={`${filtersOpen ? 'grid' : 'hidden'} grid-cols-1 gap-3 min-[480px]:grid min-[480px]:grid-cols-2 md:grid-cols-3`}>
+        <div id={`${uid}-filters`} ref={filtersRef} className={`${filtersOpen ? 'grid' : 'hidden'} grid-cols-1 gap-3 min-[480px]:grid-cols-2 md:grid-cols-3`}>
           <div className="min-w-0">
             <label id={`${uid}-scope-label`} htmlFor={`${uid}-scope`} className="mb-1 block text-xs font-semibold text-ink-2" onClick={() => document.getElementById(`${uid}-scope`)?.focus()}>
               Alcance temático
@@ -340,13 +345,15 @@ export function Agenda() {
 
       {data && (
         <div aria-live="polite" aria-busy={isFetching}>
-          <p className="mb-2 text-sm text-ink-3" data-testid="agenda-count">
-            {data.items.length === 0
-              ? 'Sin resultados'
-              : `Mostrando ${data.items.length} de ${data.total} tema${data.total === 1 ? '' : 's'}${hasFilters ? ' con los filtros aplicados' : ''}.`}
-          </p>
-          <p className="mb-3 text-xs text-ink-3" data-testid="agenda-scope-note">
-            {scope === 'in_scope' ? `${data.outOfScopeCount} temas de categoría indeterminada quedan fuera de esta agenda.` : 'Se incluyen temas fuera de las seis categorías; requieren revisión de su pertinencia.'}
+          <p className="mb-2 text-xs text-ink-3">
+            <span data-testid="agenda-count">
+              {data.items.length === 0
+                ? 'Sin resultados'
+                : `Mostrando ${data.items.length} de ${data.total} tema${data.total === 1 ? '' : 's'}${hasFilters ? ' con los filtros aplicados' : ''}.`}
+            </span>{' '}
+            <span data-testid="agenda-scope-note">
+              {scope === 'in_scope' ? `${data.outOfScopeCount} temas de categoría indeterminada quedan fuera de esta agenda.` : 'Se incluyen temas fuera de las seis categorías; requieren revisión de su pertinencia.'}
+            </span>
           </p>
           {data.items.length === 0 ? (
             <Notice tone="info" title="Ningún tema coincide" testId="agenda-empty">
