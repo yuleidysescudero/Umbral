@@ -231,11 +231,12 @@ export function Agenda() {
       </header>
 
       <form noValidate role="search" aria-label="Filtros de la agenda" className="comic-filters agenda-filters space-y-3 p-2" onSubmit={(e) => e.preventDefault()}>
-        <div className="flex items-center gap-2">
+        {/* Móvil: el buscador ocupa su propia fila y «Sin TVN» / «Filtros» van debajo, a partes iguales. */}
+        <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
           <label htmlFor={`${uid}-q`} className="sr-only">
             Buscar en los temas
           </label>
-          <div className="relative min-w-0 flex-1">
+          <div className="relative min-w-0 basis-full sm:basis-auto sm:flex-1">
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" aria-hidden="true" />
             <input
               id={`${uid}-q`}
@@ -256,9 +257,9 @@ export function Agenda() {
             )}
           </div>
 
-        <Tooltip content="Temas que otros medios reportan (≥ 2 procedencias independientes) y TVN todavía no">
+        <Tooltip className="min-w-0 flex-1 sm:flex-none" content="Temas que otros medios reportan (≥ 2 procedencias independientes) y TVN todavía no">
         <Button
-          className="shrink-0"
+          className="w-full shrink-0 justify-center sm:w-auto"
           aria-pressed={tvnGap}
           variant={tvnGap ? 'primary' : 'secondary'}
           icon={Radio}
@@ -273,7 +274,7 @@ export function Agenda() {
         </Button>
         </Tooltip>
         <Button
-          className="shrink-0 justify-between"
+          className="min-w-0 flex-1 shrink-0 justify-between sm:flex-none"
           aria-expanded={filtersOpen}
           aria-controls={`${uid}-filters`}
           onClick={() => setFiltersOpen(!filtersOpen)}

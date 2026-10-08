@@ -167,3 +167,18 @@ def test_filtro_tvn_aun_no_lo_cubre_y_modo_demo(browser):
     text = page.get_by_test_id("assistant-answer").last.inner_text()
     assert "2024" in text and "Banco Mundial" in text and "dato anual, no de hoy" in text  # pregunta literal del jurado
     page.context.close()
+
+
+def test_buscador_de_agenda_a_ancho_completo_en_movil(browser):
+    # Revisión final: a 390 px el buscador quedaba de ~80 px junto a «Sin TVN» y «Filtros».
+    page = open_app(browser, w=390, h=844)
+    form = page.locator("form.agenda-filters").first.bounding_box()
+    search = box(page, "agenda-search")
+    gap, filters = box(page, "filter-tvn-gap"), box(page, "filters-toggle")
+    assert form and search["width"] >= 0.85 * (form["width"] - 16), (search, form)
+    for b in (gap, filters):
+        assert b["y"] >= search["y"] + search["height"] - 1, ("botón debajo del buscador", b, search)
+        assert b["height"] >= 44 - 0.5
+    assert abs(gap["y"] - filters["y"]) < 2 and not overlap(gap, filters)  # misma fila, sin solaparse
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.context.close()
