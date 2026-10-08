@@ -5,6 +5,7 @@ Reglas, bandas y desempate según PLAN §3. Las fechas se evalúan contra el cor
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -21,6 +22,16 @@ from .models import (
 )
 
 RULES_VERSION = "scoring-v1"
+RULES_VERSION_V2 = "scoring-v2"
+
+
+def normalization() -> str:
+    """Normalización activa: `UMBRAL_SCORING=v2` (U continua, E con más niveles). Por defecto v1, reproducible."""
+    return "v2" if os.environ.get("UMBRAL_SCORING", "").strip().lower() == "v2" else "v1"
+
+
+def base_rules_version() -> str:
+    return RULES_VERSION_V2 if normalization() == "v2" else RULES_VERSION
 WEIGHTS = {"R": 30, "I": 25, "U": 20, "N": 15, "E": 10}
 LABELS = {"R": "Relevancia", "I": "Impacto potencial", "U": "Urgencia", "N": "Novedad", "E": "Evidencia disponible"}
 
@@ -32,13 +43,26 @@ RULE_TEXT = {
     "E": "Sin procedencia: 0; una: 0,33; dos independientes: 0,67; fuente primaria pertinente + cobertura original: 1.",
 }
 BANDS = {"bajo": "[0, 40)", "medio": "[40, 70)", "alto": "[70, 100]"}
+RULE_TEXT_V2 = {
+    **RULE_TEXT,
+    "U": "Continua: max(0, 1 − horas desde la publicación / 168). Sin fecha de publicación se usa la de detección y se indica.",
+    "E": "Como v1 (0 / 0,33 / 0,67 / 1) y +0,1 si alguna procedencia es TVN o una fuente oficial .gob.pa (máximo 1).",
+}
 CHANGELOG = [
     {
         "version": "scoring-v1",
         "date": "2026-10-07",
         "reason": "Reglas iniciales del PLAN §3. Los cambios de pesos o reglas crean una versión nueva con motivo; "
         "los cambios editoriales de impacto conservan motivo, autor y versión del caso.",
-    }
+    },
+    {
+        "version": "scoring-v2",
+        "date": "2026-10-08",
+        "reason": "Misma fórmula y pesos; cambia solo la normalización (el reto pide justificar cambios de criterios). "
+        "En v1, U escalonada (1/0,5/0) e I por defecto 0,25 dejaban 72 de los 100 primeros temas empatados en 54,55 "
+        "(35 con la agrupación semántica); con v2 el puntaje más repetido aparece 10 veces. "
+        "U pasa a ser continua en 168 h y E suma 0,1 por procedencia TVN u oficial .gob.pa. v1 sigue disponible.",
+    },
 ]
 
 _R = {GeoRelevance.panama: Fraction(1), GeoRelevance.regional: Fraction(1, 2)}
@@ -95,6 +119,8 @@ class ScoreInputs:
     provenance_known: bool
     article_ids: list[str]
     sponsored: bool = False  # posible contenido patrocinado: E máximo 0,33
+    first_detected: datetime | None = None  # v2: respaldo de U cuando no hay fecha de publicación (GDELT)
+    tvn_or_official: bool = False  # v2: alguna procedencia es TVN o un dominio .gob.pa
     geo_basis: list[tuple[str, str, list[str]]] = field(default_factory=list)  # (id, titular, evidencia del clasificador)
 
 
@@ -113,6 +139,23 @@ def urgency_value(first_published: datetime | None, cutoff: datetime) -> tuple[F
     if age <= timedelta(days=7):
         return Fraction(1, 2), f"Publicado hace {age.days} d {int(hours % 24)} h respecto al corte (≤7 d): 0,5.", limits
     return Fraction(0), f"Publicado hace {age.days} d respecto al corte (>7 d): 0.", limits
+
+
+def urgency_value_v2(first_published: datetime | None, first_detected: datetime | None, cutoff: datetime) -> tuple[Fraction, str, list[str]]:
+    limits: list[str] = []
+    when, basis = first_published, "publicación"
+    if when is None and first_detected is not None:
+        when, basis = first_detected, "detección"
+        limits.append("Sin fecha de publicación original: U se calcula con la fecha de DETECCIÓN (puede sobreestimar la urgencia).")
+    if when is None:
+        limits.append("Sin fecha de publicación ni de detección: no se infiere urgencia.")
+        return Fraction(0), "Fecha desconocida: 0.", limits
+    seconds = int((cutoff - when).total_seconds())
+    if seconds < 0:
+        limits.append("La fecha es posterior al corte del snapshot; se ignora.")
+        return Fraction(0), "Fecha posterior al corte: 0.", limits
+    value = max(Fraction(0), 1 - Fraction(seconds, 168 * 3600))
+    return value, f"Hace {seconds / 3600:.1f} h desde la {basis} respecto al corte: 1 − h/168 = {float(value):.2f}.", limits
 
 
 def evidence_value(inp: ScoreInputs) -> tuple[Fraction, str, list[str]]:
@@ -172,7 +215,11 @@ def score_topic(inp: ScoreInputs, *, weights: dict[str, int] | None = None, rule
     total += 25 * i
 
     # U
-    u, u_just, u_lim = urgency_value(inp.first_published, inp.cutoff)
+    v2 = normalization() == "v2"
+    if v2:
+        u, u_just, u_lim = urgency_value_v2(inp.first_published, inp.first_detected, inp.cutoff)
+    else:
+        u, u_just, u_lim = urgency_value(inp.first_published, inp.cutoff)
     if inp.publish_date_issue:
         u_lim.append(inp.publish_date_issue)
     comps.append(_comp("U", u, u_just, u_lim, inp.article_ids[:3]))
@@ -187,6 +234,9 @@ def score_topic(inp: ScoreInputs, *, weights: dict[str, int] | None = None, rule
 
     # E
     e, e_just, e_lim = evidence_value(inp)
+    if v2 and inp.tvn_or_official and e > 0 and not inp.sponsored:
+        e = min(Fraction(1), e + Fraction(1, 10))
+        e_just += " +0,1: alguna procedencia es TVN o una fuente oficial .gob.pa (scoring-v2)."
     ev_ids = inp.primary_source_ids + inp.article_ids[:3]
     comps.append(_comp("E", e, e_just, e_lim, ev_ids))
     total += 10 * e
@@ -218,7 +268,7 @@ def _comp(key: str, value: Fraction, just: str, limits: list[str], ids: list[str
         weight=WEIGHTS[key],
         value=float(value),
         points=round(float(WEIGHTS[key] * value), 2),
-        rule=RULE_TEXT[key],
+        rule=(RULE_TEXT_V2 if normalization() == "v2" else RULE_TEXT)[key],
         justification=just,
         limits=limits,
         evidence_ids=list(dict.fromkeys(ids)),

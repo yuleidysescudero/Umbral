@@ -91,6 +91,7 @@ class Corpus:
     integrity: IntegrityReport
     notes: list[str] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)  # USGS (events.geojson): sismos, no daños
+    neighbors: dict[str, list[tuple[str, float]]] = field(default_factory=dict)  # vecinos semánticos precalculados
 
     @property
     def counts(self) -> dict[str, int]:
@@ -234,6 +235,31 @@ def _find_metrics(path: Path, snapshot_id: str) -> dict[str, Any] | None:
     return None
 
 
+def _semantic_neighbors(path: Path, manifest: dict[str, Any], article_ids: set[str]) -> dict[str, list[tuple[str, float]]]:
+    """Vecinos semánticos precalculados (scripts/vecinos_semanticos.py). Solo si el SHA-256 del archivo y el de
+    articles.jsonl coinciden con meta.vecinos.json; si falta o no cuadra, la consulta usa solo BM25 (T10)."""
+    folder = path.parent.parent / "agrupacion" / str(manifest.get("snapshotId") or path.name)
+    meta_path, data_path = folder / "meta.vecinos.json", folder / "neighbors.semantic.jsonl"
+    if not meta_path.exists() or not data_path.exists():
+        return {}
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        raw = data_path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != meta.get("neighborsSha256"):
+            return {}
+        if sha256_file(path / "articles.jsonl") != meta.get("articlesSha256"):
+            return {}
+        out: dict[str, list[tuple[str, float]]] = {}
+        for line in raw.decode("utf-8").splitlines():
+            if line.strip():
+                row = json.loads(line)
+                if row["articleId"] in article_ids:
+                    out[row["articleId"]] = [(str(i), float(s)) for i, s in row.get("neighbors", []) if i in article_ids]
+        return out
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
 def _semantic_clusters(path: Path, manifest: dict[str, Any], clusters_raw: list[dict[str, Any]],
                        article_ids: set[str]) -> list[dict[str, Any]] | None:
     """Grupos semánticos precalculados (scripts/agrupar_semantico.py), solo con UMBRAL_SEMANTIC_CLUSTERS=1.
@@ -313,6 +339,9 @@ def load_corpus(settings: Settings) -> Corpus:
         notes.append("La verificación de integridad del snapshot reportó errores; los datos se sirven marcados como no verificados.")
 
     semantic = _semantic_clusters(path, manifest, clusters_raw, {row["articleId"] for row in articles_raw})
+    neighbors = _semantic_neighbors(path, manifest, {row["articleId"] for row in articles_raw})
+    if neighbors:
+        notes.append("Recuperación semántica multilingüe activa (vecinos precalculados, data/agrupacion/meta.vecinos.json).")
     if semantic is not None:
         clusters_raw = semantic
         notes.append("Agrupación semántica de eventos activa (data/agrupacion): paráfrasis y versiones en otro idioma "
@@ -435,4 +464,5 @@ def load_corpus(settings: Settings) -> Corpus:
         integrity=integrity,
         notes=notes,
         events=events,
+        neighbors=neighbors,
     )

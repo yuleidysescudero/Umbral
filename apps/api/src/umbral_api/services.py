@@ -72,7 +72,7 @@ from .providers import (
 )
 from .queries import QueryEngine
 from .retrieval import Doc, SearchIndex
-from .scoring import BANDS, CHANGELOG, RULE_TEXT, RULES_VERSION, WEIGHTS, ScoreInputs, score_topic, sort_key
+from .scoring import BANDS, CHANGELOG, RULE_TEXT, RULE_TEXT_V2, RULES_VERSION, WEIGHTS, ScoreInputs, base_rules_version, normalization, score_topic, sort_key
 from .snapshot import Corpus, load_corpus
 from .storage import CaseRecord, PublicGeminiCounter, Repository, build_repository
 from .topics import (
@@ -252,8 +252,10 @@ class Services:
             provenance_known=base.provenance_known,
             article_ids=[a.id for a in base.usable_articles],
             sponsored=base.sponsored_only,
+            first_detected=min((a.detected_at for a in base.usable_articles if a.detected_at), default=None),
+            tvn_or_official=any(a.is_tvn or (a.domain or "").endswith(".gob.pa") for a in base.usable_articles),
         )
-        sc = score_topic(inp, weights=rules.weights if rules else None, rules_version=rules.rules_version if rules else RULES_VERSION)
+        sc = score_topic(inp, weights=rules.weights if rules else None, rules_version=rules.rules_version if rules else base_rules_version())
         sc.id_tiebreak = base.id
         return sc
 
@@ -352,7 +354,7 @@ class Services:
             provisional=c.provisional,
             contains_fixtures=c.contains_fixtures,
             classifier=c.classifier,
-            rules_version=RULES_VERSION,
+            rules_version=base_rules_version(),
             cutoff_utc=c.cutoff,
             offline=self.settings.offline,
             local_mode=self.settings.local_mode,
@@ -374,11 +376,11 @@ class Services:
         latest = record.history[-1] if record and record.history else None
         weights = latest.weights if latest else WEIGHTS
         return RulesResponse(
-            rules_version=latest.rules_version if latest else RULES_VERSION,
+            rules_version=latest.rules_version if latest else base_rules_version(),
             formula="P = " + " + ".join(f"{weights[k]}{k}" for k in WEIGHTS),
             weights=weights,
             bands=BANDS,
-            rules=RULE_TEXT,
+            rules=RULE_TEXT_V2 if normalization() == "v2" else RULE_TEXT,
             changelog=CHANGELOG,
             version=record.version if record else 0,
             history=record.history if record else [],
@@ -392,7 +394,7 @@ class Services:
             })
         revision = record.version + 1
         record.history.append(RulesRevision(
-            version=revision, rules_version=f"scoring-v{revision + 1}", weights=request.weights,
+            version=revision, rules_version=(f"scoring-v2.{revision}" if normalization() == "v2" else f"scoring-v{revision + 1}"), weights=request.weights,
             reason=request.reason.strip(), author=request.author.strip(), at=now_utc(),
         ))
         record.version = revision
@@ -719,7 +721,7 @@ class Services:
             recovered_from_draft_id=recovered_from,
             created_at=now_utc(),
             snapshot_id=self.corpus.snapshot_id,
-            rules_version=RULES_VERSION,
+            rules_version=base_rules_version(),
             package=cleaned,
             validation=report,
         )

@@ -166,6 +166,9 @@ def main() -> int:
         raise SystemExit("La API cambió snapshotId durante la ejecución; no se publican métricas mezcladas.")
     known_ids = {r["articleId"] for r in read_jsonl(a.snapshot / "articles.jsonl")} | {
         r["indicatorRowId"] for r in read_jsonl(a.snapshot / "indicators.jsonl")}
+    events = a.snapshot / "events.geojson"  # sismos USGS: también son evidencia citable del paquete
+    if events.exists():
+        known_ids |= {f["properties"]["id"] for f in json.loads(events.read_text(encoding="utf-8")).get("features", [])}
     summary = score(items, results, known_ids)
     report = {
         "command": " ".join(sys.argv),

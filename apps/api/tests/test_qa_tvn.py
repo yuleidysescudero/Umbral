@@ -205,3 +205,54 @@ def test_spanish_headline_is_representative_when_available(real):
     assert checked > 100
     items = real.get("/api/v1/topics", params={"limit": 5}).json()["items"]
     assert all("titleLanguage" in t for t in items)
+
+
+# ---------------------------------------------------------------- 3.9 ranking menos plano (scoring-v2)
+def _ties(client) -> int:
+    from collections import Counter
+
+    items = client.get("/api/v1/topics", params={"limit": 100, "scope": "all"}).json()["items"]
+    return max(Counter(t["score"] for t in items).values())
+
+
+@needs_real
+def test_scoring_v2_breaks_ties_and_v1_stays_available(tmp_path, monkeypatch):
+    monkeypatch.setenv("UMBRAL_SEMANTIC_CLUSTERS", "1")
+    monkeypatch.setenv("UMBRAL_SCORING", "v1")
+    s1 = make_settings(REAL, tmp_path / "a")
+    v1 = TestClient(create_app(s1, services=Services(s1)), headers={"X-Umbral-User": "qa"})
+    ties_v1 = _ties(v1)
+    assert v1.get("/api/v1/rules").json()["rulesVersion"] == "scoring-v1"
+    monkeypatch.setenv("UMBRAL_SCORING", "v2")
+    s2 = make_settings(REAL, tmp_path / "b")
+    v2 = TestClient(create_app(s2, services=Services(s2)), headers={"X-Umbral-User": "qa"})
+    ties_v2 = _ties(v2)
+    assert v2.get("/api/v1/rules").json()["rulesVersion"] == "scoring-v2"
+    print(f"empates máximos en el top 100: v1={ties_v1}, v2={ties_v2}")
+    assert ties_v2 <= 10 < ties_v1
+
+
+# ---------------------------------------------------------------- 3.4 contradicción real (T05) y recuperación multilingüe
+@needs_real
+def test_real_t05_pair_32_vs_33_transits_is_a_contradiction(real):
+    r = ask(real, "¿El Canal mantendrá 32 tránsitos hasta diciembre?")
+    assert r["answerStatus"] == "contradiccion", r["answer"][:500]
+    assert r["retrieval"]["method"] == "bm25+rapidfuzz+semantico-rrf"
+    c = next(c for c in r["contradictions"] if "tránsitos diarios" in c["description"])
+    ids = {v["evidenceId"] for v in c["versions"]}
+    assert "art_8b729f2b5fc9618c" in ids  # La Estrella: 32 tránsitos
+    assert ids & {"art_92fff79020ce94f0", "art_39666969ba302f59"}  # «... transits ... to 33»
+    assert "Posible actualización" in c["description"] and "ACP" in c["description"]
+    assert all(v["publishedAt"] or v["detectedAt"] for v in c["versions"])
+
+
+def test_numeric_claims_es_en():
+    from umbral_api.topics import numeric_claims
+
+    assert ("tránsitos diarios", 32.0) in numeric_claims("Canal de Panamá evita nuevas restricciones y mantendrá 32 tránsitos hasta diciembre")
+    assert ("tránsitos diarios", 33.0) in numeric_claims("Panama Canal Increases Daily Transits to 33 and Maximum Draft to 49 Feet .")
+
+
+def test_without_neighbors_falls_back_to_bm25(make_app):
+    r = make_app().post("/api/v1/queries", json={"question": "calado del Canal por el lago Gatún"}).json()
+    assert r["retrieval"]["method"] == "bm25+rapidfuzz"

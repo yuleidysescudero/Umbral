@@ -1171,6 +1171,19 @@
       },
       "ContradictionVersion-Input": {
         "properties": {
+          "detectedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fecha de detección (cuando no hay fecha de publicación)",
+            "title": "Detectedat"
+          },
           "evidenceId": {
             "title": "Evidenceid",
             "type": "string"
@@ -1211,6 +1224,19 @@
       },
       "ContradictionVersion-Output": {
         "properties": {
+          "detectedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fecha de detección (cuando no hay fecha de publicación)",
+            "title": "Detectedat"
+          },
           "evidenceId": {
             "title": "Evidenceid",
             "type": "string"
@@ -1245,7 +1271,8 @@
           "statement",
           "scope",
           "outlet",
-          "publishedAt"
+          "publishedAt",
+          "detectedAt"
         ],
         "title": "ContradictionVersion",
         "type": "object"
@@ -4104,7 +4131,9 @@
           "agenda",
           "contexto_economico",
           "verificaciones",
-          "busqueda"
+          "busqueda",
+          "eventos_sismicos",
+          "resumen_periodo"
         ],
         "title": "QueryIntent",
         "type": "string"
@@ -4758,6 +4787,12 @@
             "title": "Disclaimer",
             "type": "string"
           },
+          "display": {
+            "default": "",
+            "description": "Total redondeado una sola vez (ROUND_HALF_UP, coma decimal), igual en tarjeta, «Por qué» y exportación.",
+            "title": "Display",
+            "type": "string"
+          },
           "formula": {
             "default": "P = 30R + 25I + 20U + 15N + 10E",
             "title": "Formula",
@@ -4808,6 +4843,12 @@
             "title": "Disclaimer",
             "type": "string"
           },
+          "display": {
+            "default": "",
+            "description": "Total redondeado una sola vez (ROUND_HALF_UP, coma decimal), igual en tarjeta, «Por qué» y exportación.",
+            "title": "Display",
+            "type": "string"
+          },
           "formula": {
             "default": "P = 30R + 25I + 20U + 15N + 10E",
             "title": "Formula",
@@ -4832,6 +4873,7 @@
         },
         "required": [
           "total",
+          "display",
           "band",
           "rulesVersion",
           "formula",
@@ -5358,9 +5400,27 @@
             "title": "Scorecomponents",
             "type": "array"
           },
+          "scoreDisplay": {
+            "default": "",
+            "description": "Puntaje redondeado una sola vez en la API (ROUND_HALF_UP, coma decimal); la web lo muestra tal cual.",
+            "title": "Scoredisplay",
+            "type": "string"
+          },
           "title": {
             "title": "Title",
             "type": "string"
+          },
+          "titleLanguage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Idioma del titular representativo; si no es 'es', la web muestra «Titular en inglés» (sin traducir).",
+            "title": "Titlelanguage"
           },
           "topReason": {
             "default": "",
@@ -5522,9 +5582,27 @@
             "title": "Scorecomponents",
             "type": "array"
           },
+          "scoreDisplay": {
+            "default": "",
+            "description": "Puntaje redondeado una sola vez en la API (ROUND_HALF_UP, coma decimal); la web lo muestra tal cual.",
+            "title": "Scoredisplay",
+            "type": "string"
+          },
           "title": {
             "title": "Title",
             "type": "string"
+          },
+          "titleLanguage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Idioma del titular representativo; si no es 'es', la web muestra «Titular en inglés» (sin traducir).",
+            "title": "Titlelanguage"
           },
           "topReason": {
             "default": "",
@@ -5543,6 +5621,8 @@
           "category",
           "categoryLabel",
           "score",
+          "titleLanguage",
+          "scoreDisplay",
           "band",
           "scoreComponents",
           "urgency",

@@ -805,6 +805,11 @@ export interface components {
         };
         /** ContradictionVersion */
         "ContradictionVersion-Input": {
+            /**
+             * Detectedat
+             * @description Fecha de detección (cuando no hay fecha de publicación)
+             */
+            detectedAt?: string | null;
             /** Evidenceid */
             evidenceId: string;
             /** Outlet */
@@ -818,6 +823,11 @@ export interface components {
         };
         /** ContradictionVersion */
         "ContradictionVersion-Output": {
+            /**
+             * Detectedat
+             * @description Fecha de detección (cuando no hay fecha de publicación)
+             */
+            detectedAt: string | null;
             /** Evidenceid */
             evidenceId: string;
             /** Outlet */
@@ -1844,7 +1854,7 @@ export interface components {
          * QueryIntent
          * @enum {string}
          */
-        QueryIntent: "agenda" | "contexto_economico" | "verificaciones" | "busqueda";
+        QueryIntent: "agenda" | "contexto_economico" | "verificaciones" | "busqueda" | "eventos_sismicos" | "resumen_periodo";
         /** QueryRequest */
         QueryRequest: {
             /**
@@ -2123,6 +2133,12 @@ export interface components {
              */
             disclaimer: string;
             /**
+             * Display
+             * @description Total redondeado una sola vez (ROUND_HALF_UP, coma decimal), igual en tarjeta, «Por qué» y exportación.
+             * @default
+             */
+            display: string;
+            /**
              * Formula
              * @default P = 30R + 25I + 20U + 15N + 10E
              */
@@ -2146,6 +2162,12 @@ export interface components {
              * @default Puntaje de atención: herramienta de ordenamiento, no una probabilidad de verdad. Una prioridad alta no habilita publicación.
              */
             disclaimer: string;
+            /**
+             * Display
+             * @description Total redondeado una sola vez (ROUND_HALF_UP, coma decimal), igual en tarjeta, «Por qué» y exportación.
+             * @default
+             */
+            display: string;
             /**
              * Formula
              * @default P = 30R + 25I + 20U + 15N + 10E
@@ -2345,8 +2367,19 @@ export interface components {
             score: number;
             /** Scorecomponents */
             scoreComponents?: components["schemas"]["ScoreComponent-Input"][];
+            /**
+             * Scoredisplay
+             * @description Puntaje redondeado una sola vez en la API (ROUND_HALF_UP, coma decimal); la web lo muestra tal cual.
+             * @default
+             */
+            scoreDisplay: string;
             /** Title */
             title: string;
+            /**
+             * Titlelanguage
+             * @description Idioma del titular representativo; si no es 'es', la web muestra «Titular en inglés» (sin traducir).
+             */
+            titleLanguage?: string | null;
             /**
              * Topreason
              * @default
@@ -2432,8 +2465,19 @@ export interface components {
             score: number;
             /** Scorecomponents */
             scoreComponents: components["schemas"]["ScoreComponent-Output"][];
+            /**
+             * Scoredisplay
+             * @description Puntaje redondeado una sola vez en la API (ROUND_HALF_UP, coma decimal); la web lo muestra tal cual.
+             * @default
+             */
+            scoreDisplay: string;
             /** Title */
             title: string;
+            /**
+             * Titlelanguage
+             * @description Idioma del titular representativo; si no es 'es', la web muestra «Titular en inglés» (sin traducir).
+             */
+            titleLanguage: string | null;
             /**
              * Topreason
              * @default

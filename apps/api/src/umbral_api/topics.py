@@ -29,6 +29,7 @@ from .models import (
 )
 from .retrieval import fold, stem
 from .snapshot import Corpus
+from .util import fmt_date_pa
 
 MASKED_TITLE = "[texto con instrucciones omitido]"
 HEADLINE_NOTICE = "Basado únicamente en titular/metadatos: no se leyó el artículo completo ni se le atribuyen detalles adicionales."
@@ -121,6 +122,84 @@ def _num(s: str) -> float | None:
         return float(s)
     except ValueError:
         return None
+
+
+# QA TVN 3.4: misma magnitud en español e inglés («32 tránsitos» / «Daily Transits to 33»). Raíz → magnitud canónica.
+_MAGNITUDE = {
+    "transito": "tránsitos diarios", "transit": "tránsitos diarios", "slot": "tránsitos diarios", "cupo": "tránsitos diarios",
+    "buque": "buques", "barco": "buques", "nave": "buques", "vessel": "buques", "ship": "buques",
+    "pie": "pies de calado", "pies": "pies de calado", "feet": "pies de calado", "foot": "pies de calado", "draft": "pies de calado",
+    "calado": "pies de calado",
+    "turista": "turistas", "visitante": "turistas", "tourist": "turistas", "visitor": "turistas",
+    "muerto": "fallecidos", "fallecido": "fallecidos", "dead": "fallecidos", "death": "fallecidos",
+    "herido": "heridos", "injured": "heridos",
+}
+_MAGNITUDE_SOURCE = {
+    "tránsitos diarios": "ACP", "buques": "ACP", "pies de calado": "ACP",
+    "turistas": "ATP / INEC", "fallecidos": "SINAPROC / MINSA", "heridos": "SINAPROC / MINSA",
+}
+_NOUN_TO_NUM = re.compile(r"\b([a-záéíóúñ]+)\s+(?:to|a|hasta|of|de)\s+(\d[\d.,]*)", re.IGNORECASE)
+
+
+def numeric_claims(title: str) -> list[tuple[str, float]]:
+    """(magnitud canónica, valor) en un titular, en español o inglés: «48 pies y 32 tránsitos», «Transits to 33»."""
+    out: list[tuple[str, float]] = []
+    for m in _NUM_NOUN.finditer(title):
+        canon = _MAGNITUDE.get(stem(fold(m.group(2))))
+        val = _num(m.group(1))
+        if canon and val is not None and (canon, val) not in out:
+            out.append((canon, val))
+    for m in _NOUN_TO_NUM.finditer(title):
+        canon = _MAGNITUDE.get(stem(fold(m.group(1))))
+        val = _num(m.group(2))
+        if canon and val is not None and not re.fullmatch(r"(19|20)\d\d", m.group(2)) and (canon, val) not in out:
+            out.append((canon, val))
+    return out
+
+
+def cross_contradictions(arts: list[EvidenceArticle], *, window_days: int = 45) -> list[Contradiction]:
+    """Cifras distintas para la misma magnitud entre notas recuperadas juntas (aunque estén en temas distintos).
+
+    No elige versión: muestra ambas con fuente y fecha, y advierte que puede ser una actualización."""
+    by_mag: dict[str, dict[float, list[EvidenceArticle]]] = {}
+    seen: set[str] = set()
+    for a in arts:
+        if a.suspicious_instructions or a.id in seen:
+            continue
+        seen.add(a.id)
+        for canon, val in numeric_claims(a.title):
+            by_mag.setdefault(canon, {}).setdefault(val, []).append(a)
+    out: list[Contradiction] = []
+    for canon, values in sorted(by_mag.items()):
+        if len(values) < 2:
+            continue
+        dated = [(a.published_at or a.detected_at) for g in values.values() for a in g]
+        known = [d for d in dated if d is not None]
+        if len(known) >= 2 and (max(known) - min(known)).days > window_days:
+            continue  # demasiado separadas en el tiempo: no son versiones del mismo momento
+        versions = []
+        parts = []
+        for val, group in sorted(values.items()):
+            a0 = group[0]
+            when = a0.published_at or a0.detected_at
+            basis = "publicado" if a0.published_at else "detectado"
+            parts.append(f"{fmt_es(val)} ({a0.outlet}, {basis} {fmt_date_pa(when) if when else 'sin fecha'})")
+            for a in group:
+                versions.append(ContradictionVersion(
+                    evidence_id=a.id, statement=a.title, scope="titular/metadatos", outlet=a.outlet,
+                    published_at=a.published_at, detected_at=a.detected_at,
+                ))
+        source = _MAGNITUDE_SOURCE.get(canon, "la fuente primaria")
+        out.append(Contradiction(
+            id=f"cruce:{stem(fold(canon)).replace(' ', '_')}",
+            description=(
+                f"Cifras distintas para «{canon}»: {' vs '.join(parts)}. No se elige una versión. "
+                f"Posible actualización: verificar fecha y fuente primaria — {source}."
+            ),
+            versions=versions,
+            pending_verification=f"Confirmar con {source} cuál cifra está vigente y desde qué fecha.",
+        ))
+    return out
 
 
 def detect_contradictions(

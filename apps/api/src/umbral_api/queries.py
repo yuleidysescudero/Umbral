@@ -22,11 +22,11 @@ from .models import (
     RetrievalInfo,
     TopicSummary,
 )
-from .retrieval import Doc, SearchIndex, fold, tokenize
-from .scoring import RULES_VERSION
+from .retrieval import Doc, Hit, SearchIndex, fold, tokenize
+from .scoring import RULES_VERSION, base_rules_version
 from .security import looks_like_instruction, looks_like_profiling, split_injection
 from .snapshot import Corpus, parse_dt
-from .topics import COUNTRY_KEYWORDS, INDICATOR_KEYWORDS, MASKED_TITLE, TopicBase
+from .topics import COUNTRY_KEYWORDS, INDICATOR_KEYWORDS, MASKED_TITLE, TopicBase, cross_contradictions
 from .util import fmt_date_pa
 
 INDICATOR_ES = {
@@ -195,6 +195,7 @@ class QueryEngine:
                 )
             )
         self.index = SearchIndex(docs)
+        self._doc_by_id = {d.doc_id: d for d in docs}
         self.article_ids = set(corpus.articles)
 
     # ------------------------------------------------------------------ API
@@ -289,6 +290,7 @@ class QueryEngine:
             rules_version=RULES_VERSION,
             data_mode=self.corpus.data_mode,
             retrieval=RetrievalInfo(
+                method=kw.pop("method", "bm25+rapidfuzz"),
                 corpus_size=len(self.index.docs),
                 took_ms=round((time.perf_counter() - t0) * 1000, 2),
                 matched_terms=kw.pop("matched_terms", []),
@@ -360,6 +362,39 @@ class QueryEngine:
                     out.append(raw)
         return list(dict.fromkeys(out))
 
+    def _semantic_fuse(self, hits: list[Hit], restrict: set[str] | None) -> tuple[list[Hit], bool]:
+        """BM25 + vecinos semánticos precalculados de sus mejores artículos, fusionados con RRF (k=60).
+
+        Un vecino entra con los términos y la cobertura del resultado que lo trajo (es su paráfrasis o su versión en
+        otro idioma). Sin vecinos precalculados se devuelve el ranking BM25 intacto (T10)."""
+        nb = self.corpus.neighbors
+        if not nb or not hits:
+            return hits, False
+        sem_score: dict[str, float] = {}
+        source: dict[str, Hit] = {}
+        for h in [h for h in hits if h.doc.kind == "articulo"][:5]:
+            for nid, sim in nb.get(h.doc.doc_id, []):
+                if restrict is not None and nid not in restrict:
+                    continue
+                if sim > sem_score.get(nid, 0.0):
+                    sem_score[nid], source[nid] = sim, h
+        if not sem_score:
+            return hits, False
+        rrf: dict[str, float] = {}
+        by_id = {h.doc.doc_id: h for h in hits}
+        for rank, h in enumerate(hits, 1):
+            rrf[h.doc.doc_id] = rrf.get(h.doc.doc_id, 0.0) + 1 / (60 + rank)
+        for rank, nid in enumerate(sorted(sem_score, key=lambda i: (-sem_score[i], i)), 1):
+            rrf[nid] = rrf.get(nid, 0.0) + 1 / (60 + rank)
+            src = source[nid]
+            if nid in by_id and by_id[nid].coverage < src.coverage:
+                old = by_id[nid]  # coincidencia léxica débil, pero es paráfrasis/traducción de un buen resultado
+                by_id[nid] = Hit(old.doc, old.bm25, max(old.fuzzy, sem_score[nid]), old.relevance, list(src.matched), src.coverage)
+            elif nid not in by_id and nid in self._doc_by_id:
+                by_id[nid] = Hit(self._doc_by_id[nid], 0.0, round(sem_score[nid], 4), src.relevance, list(src.matched), src.coverage)
+        fused = sorted(by_id.values(), key=lambda h: (-rrf.get(h.doc.doc_id, 0.0), h.doc.doc_id))
+        return fused[: max(len(hits), 8)], True
+
     def _as_written(self, question: str, toks) -> list[str]:  # noqa: ANN001
         """Términos internos (raíz o corregidos) → la palabra tal como la escribió la persona."""
         wanted = set(toks)
@@ -403,7 +438,7 @@ class QueryEngine:
                 continue
             cites.append(QueryCitation(evidence_id=rep.id, field="title", passage=rep.title, title=rep.title, url=rep.url))
         ans = (
-            f"**Temas que merecen revisión** según `{RULES_VERSION}` (snapshot {self.corpus.snapshot_id}).\n\n"
+            f"**Temas que merecen revisión** según `{base_rules_version()}` (snapshot {self.corpus.snapshot_id}).\n\n"
             "Basado únicamente en titular/metadatos: el puntaje ordena, no demuestra verdad ni habilita publicación.\n\n"
             + "\n".join(lines)
         )
@@ -673,6 +708,9 @@ class QueryEngine:
                 hits=hit_models, coverage=coverage, matched=best.matched,
                 missing=[f"Evidencia que mencione: {', '.join(self._as_written(req.question, set(qtoks) - set(best.matched)))}."],
             )
+        # La cobertura se decide con BM25; después se suman paráfrasis y versiones en otro idioma (RRF).
+        hits, semantic = self._semantic_fuse(hits, restrict)
+        hit_models = [self._hit_model(h) for h in hits[: req.limit]]
         # ¿pide una cifra? solo se responde si algún titular relevante la contiene
         wants_number = bool(_RE_NUMERIC.search(fold(req.question)))
         arts = [h for h in hits if h.doc.kind == "articulo"]
@@ -728,11 +766,11 @@ class QueryEngine:
         missing: list[str] = []
         used_clusters: list[str] = []
         usable_ids = {h.doc.doc_id for h in usable}
-        for h in usable[:3]:
+        for h in usable[:4]:
             a = self.corpus.articles[h.doc.doc_id]
             if a.cluster_id and a.cluster_id not in used_clusters:
                 used_clusters.append(a.cluster_id)
-        for cid in used_clusters[:2]:
+        for cid in used_clusters[:3]:
             base = self.bases.get(cid)
             if base is None:
                 continue
@@ -762,6 +800,13 @@ class QueryEngine:
                 lines.append(f"  Atención: posible noticia antigua recirculada ({base.recirculation_reason or 'fecha original anterior'}).")
             contradictions.extend(base.contradictions)
             missing.extend(base.pending[:3])
+        # QA TVN 3.4: la misma magnitud con valores distintos entre notas recuperadas juntas (ES/EN, temas distintos).
+        known_ids = {c.id for c in contradictions}
+        pool = [self.corpus.articles[c.evidence_id] for c in cites if c.evidence_id in self.corpus.articles]
+        pool += [self.corpus.articles[h.doc.doc_id] for h in usable]
+        for c in cross_contradictions(pool):
+            if c.id not in known_ids:
+                contradictions.insert(0, c)
         for h in ind_hits[:2]:
             p = self.corpus.indicators[h.doc.doc_id]
             if p.is_missing:
@@ -775,7 +820,9 @@ class QueryEngine:
             for c in contradictions:
                 lines.append(f"  · {c.description}")
                 for v in c.versions:
-                    lines.append(f"    - {v.outlet}: «{v.statement}» [{v.evidence_id}]")
+                    when = (f"publicado {fmt_date_pa(v.published_at)}" if v.published_at
+                            else f"detectado {fmt_date_pa(v.detected_at)}" if v.detected_at else "sin fecha")
+                    lines.append(f"    - {v.outlet} ({when}): «{v.statement}» [{v.evidence_id}]")
         ans = (
             "Lo que reporta el corpus (basado únicamente en titular/metadatos; no se leyó el artículo completo):\n"
             + "\n".join(lines)
@@ -784,6 +831,7 @@ class QueryEngine:
             req, QueryIntent.busqueda, t0, answer_status=status, answer=ans, citations=cites, hits=hit_models,
             contradictions=contradictions, missing=list(dict.fromkeys(missing)), related_topic_ids=related,
             warnings=warnings, coverage=coverage, matched_terms=best.matched,
+            method="bm25+rapidfuzz+semantico-rrf" if semantic else "bm25+rapidfuzz",
         )
 
 

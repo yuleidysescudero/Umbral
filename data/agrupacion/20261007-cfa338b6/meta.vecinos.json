@@ -1,0 +1,16 @@
+{
+ "schemaVersion": 1,
+ "snapshotId": "20261007-cfa338b6",
+ "generatedAt": "2026-10-08T13:50:19+00:00",
+ "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+ "text": "titular sin la entidad «Panamá»",
+ "k": 8,
+ "threshold": 0.6,
+ "fusion": "reciprocal rank fusion (k=60) entre BM25+RapidFuzz y vecinos semánticos de los mejores resultados",
+ "neighborsSha256": "55143c83e451678798efbce7f1478b95b1b236daea3f75c93f2c10cc1a3ac7e0",
+ "embeddingsSha256": "a409369716419dea3910db395c501a6086647b1939341c273f5e2f44055a5c58",
+ "idsSha256": "65caf53aebe05a6095d1dac3528d3ae68dbba220be1e21aa20cd03faf47a3a0d",
+ "articlesSha256": "4c719044cb745234d370d5263ed96e2a5b67f110f776c6db462b9577e578c070",
+ "articles": 991,
+ "withNeighbors": 608
+}
